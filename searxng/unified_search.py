@@ -66,6 +66,15 @@ class UnifiedSearchService:
         self.result_aggregator = get_result_aggregator()
         logger.info("Unified Search Service initialized with Query Router")
 
+    async def _safe_add_search_query(self, query: str):
+        """Safely add search query to topic expander in background."""
+        try:
+            from searxng.topic_expander import get_topic_expander
+            expander = get_topic_expander()
+            await expander.add_search_query(query)
+        except Exception as e:
+            logger.debug(f"Query recording background task failed: {e}")
+
     async def search(self, request: UnifiedSearchRequest) -> UnifiedSearchResponse:
         """
         Perform unified search with intent extraction and ranking.
@@ -92,13 +101,7 @@ class UnifiedSearchService:
         )
 
         # Record query for topic learning (async, non-blocking)
-        try:
-            from searxng.topic_expander import get_topic_expander
-
-            expander = get_topic_expander()
-            asyncio.create_task(expander.add_search_query(request.query))
-        except Exception as e:
-            logger.debug(f"Query recording failed (non-critical): {e}")
+        asyncio.create_task(self._safe_add_search_query(request.query))
 
         # Step 1: Extract intent (if enabled)
         universal_intent = None
@@ -146,7 +149,7 @@ class UnifiedSearchService:
         logger.info(f"Aggregated to {len(aggregated_results)} unique results")
 
         # Convert aggregated results to ranked results
-        ranked_results = self._convert_aggregated_to_ranked(aggregated_results, universal_intent, request)
+        ranked_results = await self._convert_aggregated_to_ranked(aggregated_results, universal_intent, request)
 
         # Step 5: Apply privacy filters (if requested)
         if request.min_privacy_score or request.exclude_big_tech:
@@ -335,125 +338,6 @@ class UnifiedSearchService:
             research_plan=research_plan_dict,
         )
 
-    async def _search_searxng(self, request: UnifiedSearchRequest) -> list[SearXNGResult]:
-        """Search SearXNG and return results."""
-        try:
-            logger.debug(f"_search_searxng: calling SearXNG client with query='{request.query}'")
-            response = await self.searxng_client.search(
-                query=request.query,
-                categories=request.categories,
-                engines=request.engines,
-                language=request.language,
-                safe_search=request.safe_search,
-                time_range=request.time_range,
-            )
-            logger.debug(
-                f"_search_searxng: got {len(response.results) if response else 0} results from SearXNGResponse"
-            )
-            return response.results if response else []
-        except Exception as e:
-            logger.error(f"SearXNG search failed: {e}")
-            # Return empty results on error
-            return []
-
-    async def _rank_with_intent(
-        self,
-        results: list[SearXNGResult],
-        universal_intent: UniversalIntent,
-        request: UnifiedSearchRequest,
-    ) -> list[RankedSearchResult]:
-        """
-        Rank search results based on intent alignment.
-
-        Uses the URL ranker to score and rank results based on:
-        - Query relevance
-        - Intent alignment
-        - Privacy compliance
-        - Ethical alignment
-        """
-        logger.debug(f"_rank_with_intent: {len(results)} results, intent={universal_intent is not None}")
-
-        # Convert SearXNG results to URL ranking format (list of URL strings)
-        urls_to_rank = [r.url for r in results]
-        logger.debug(f"urls_to_rank: {len(urls_to_rank)} URLs")
-
-        # Build URL ranking request
-        ranking_request = URLRankingRequest(
-            query=request.query,
-            urls=urls_to_rank,
-            intent=universal_intent,
-            options={
-                "weights": request.weights,
-                "min_privacy_score": request.min_privacy_score,
-                "exclude_big_tech": request.exclude_big_tech,
-            },
-        )
-
-        # Rank URLs
-        logger.debug("Calling rank_urls...")
-        ranking_response = await rank_urls(ranking_request)
-        logger.debug(f"ranking_response: {ranking_response is not None}")
-
-        # Defensive: check if ranking_response is None
-        if ranking_response is None:
-            logger.error("rank_urls returned None, returning original results")
-            return self._convert_to_ranked_results(results)
-
-        ranked_map = {r.url: r for r in ranking_response.ranked_urls}
-        logger.debug(f"ranked_map built with {len(ranked_map)} entries")
-
-        ranked_results = []
-        for idx, ranked in enumerate(ranking_response.ranked_urls):
-            # Find original SearXNG result
-            original = next((r for r in results if r.url == ranked.url), None)
-
-            ranked_result = RankedSearchResult(
-                url=ranked.url,
-                title=ranked.title or (original.title if original else ""),
-                content=ranked.description or (original.content if original else ""),
-                engine=original.engine if original else "unknown",
-                original_score=(original.score if original and original.score is not None else 0.0),
-                ranked_score=ranked.final_score,
-                rank=idx + 1,
-                category=original.category if original else "general",
-                thumbnail=original.thumbnail if original else None,
-                published_date=original.published_date if original else None,
-                intent_goal=(
-                    universal_intent.declared.goal.value
-                    if universal_intent.declared and universal_intent.declared.goal
-                    else None
-                ),
-                match_reasons=self._generate_match_reasons(ranked, universal_intent),
-                privacy_score=ranked.privacy_score,
-                ethical_alignment=ranked.privacy_score,  # Use privacy as proxy for ethics
-            )
-            ranked_results.append(ranked_result)
-
-        logger.debug(f"_rank_with_intent returning {len(ranked_results)} results")
-        return ranked_results
-
-    def _convert_to_ranked_results(self, results: list[SearXNGResult]) -> list[RankedSearchResult]:
-        """Convert SearXNG results to RankedSearchResult without intent ranking."""
-        return [
-            RankedSearchResult(
-                url=r.url,
-                title=r.title,
-                content=r.content,
-                engine=r.engine,
-                original_score=r.score if r.score is not None else 0.0,
-                ranked_score=r.score if r.score is not None else 0.0,
-                rank=r.position,
-                category=r.category,
-                thumbnail=r.thumbnail,
-                published_date=r.published_date,
-                intent_goal=None,
-                match_reasons=[],
-                privacy_score=None,
-                ethical_alignment=None,
-            )
-            for r in results
-        ]
-
     def _apply_privacy_filters(
         self, results: list[RankedSearchResult], request: UnifiedSearchRequest
     ) -> list[RankedSearchResult]:
@@ -493,40 +377,6 @@ class UnifiedSearchService:
 
         return filtered
 
-    def _generate_match_reasons(self, ranked_result: Any, universal_intent: UniversalIntent) -> list[str]:
-        """Generate human-readable match reasons for a result."""
-        reasons = []
-
-        # Defensive: check if universal_intent or its components are None
-        if not universal_intent:
-            return reasons
-
-        declared = universal_intent.declared if universal_intent.declared else None
-        inferred = universal_intent.inferred if universal_intent.inferred else None
-
-        # Intent goal match
-        if declared and declared.goal:
-            reasons.append(f"Matches {declared.goal.value} intent")
-
-        # Use case match
-        if inferred and inferred.useCases:
-            use_case = inferred.useCases[0]
-            reasons.append(f"Suitable for {use_case.value}")
-
-        # Privacy alignment
-        if hasattr(ranked_result, "privacy_score") and ranked_result.privacy_score:
-            if ranked_result.privacy_score > 0.8:
-                reasons.append("High privacy rating")
-            elif ranked_result.privacy_score > 0.5:
-                reasons.append("Good privacy rating")
-
-        # Ethical signals
-        if inferred and inferred.ethicalSignals:
-            for signal in inferred.ethicalSignals:
-                reasons.append(f"Aligns with {signal.dimension.value} values")
-
-        return reasons[:3]  # Limit to top 3 reasons
-
     # NEW: Helper methods for Query Router integration
 
     async def _search_searxng_as_router_results(self, request: UnifiedSearchRequest) -> list[RouterSearchResult]:
@@ -562,7 +412,7 @@ class UnifiedSearchService:
             logger.error(f"SearXNG fallback search failed: {e}")
             return []
 
-    def _convert_aggregated_to_ranked(
+    async def _convert_aggregated_to_ranked(
         self,
         aggregated: list[AggregatedResult],
         universal_intent: UniversalIntent | None,
@@ -612,7 +462,7 @@ class UnifiedSearchService:
                     },
                 )
 
-                ranking_response = asyncio.run(rank_urls(ranking_request))
+                ranking_response = await rank_urls(ranking_request)
 
                 if ranking_response:
                     # Update scores from ranking response
