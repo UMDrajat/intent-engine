@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DebuggingSuggestion:
     """A debugging suggestion for the user"""
-    
+
     title: str
     description: str
     priority: int  # 1-5, 1 being highest
@@ -33,7 +33,7 @@ class DebuggingSuggestion:
 @dataclass
 class RelatedError:
     """Information about a related error"""
-    
+
     error_name: str
     common_causes: list[str]
     typical_solutions: list[str]
@@ -43,7 +43,7 @@ class RelatedError:
 @dataclass
 class ResearchPlan:
     """A structured plan for researching and resolving a programming issue"""
-    
+
     investigation_steps: list[str] = field(default_factory=list)
     optimized_search_queries: dict[str, str] = field(default_factory=dict)
     key_concepts: list[str] = field(default_factory=list)
@@ -53,7 +53,7 @@ class ResearchPlan:
 @dataclass
 class DeveloperAssistanceResponse:
     """Enhanced response for programming queries"""
-    
+
     programming_context: ProgrammingContext
     suggestions: list[DebuggingSuggestion] = field(default_factory=list)
     related_errors: list[RelatedError] = field(default_factory=list)
@@ -74,55 +74,61 @@ class DynamicResearchPlanner:
         Generate a dynamic research plan.
         """
         plan = ResearchPlan()
-        
+
         # 1. Generate investigation steps
         plan.investigation_steps = self._generate_investigation_steps(context)
-        
+
         # 2. Generate optimized search queries
         plan.optimized_search_queries = self._generate_search_queries(context, query)
-        
+
         # 3. Identify key concepts
         plan.key_concepts = self._identify_key_concepts(context)
-        
+
         return plan
 
     def _generate_investigation_steps(self, context: ProgrammingContext) -> list[str]:
         steps = []
-        
+
         # Base steps
         if context.hasStackTrace:
             steps.append("Analyze the stack trace from bottom to top to identify your code's entry point.")
-        
+
         # Error specific steps
         if context.errorType == ErrorType.IMPORT_ERROR:
-            steps.extend([
-                "Check if the package is installed in your current environment.",
-                "Verify your virtual environment is activated.",
-                "Check for circular imports in your module structure."
-            ])
+            steps.extend(
+                [
+                    "Check if the package is installed in your current environment.",
+                    "Verify your virtual environment is activated.",
+                    "Check for circular imports in your module structure.",
+                ]
+            )
         elif context.errorType == ErrorType.NULL_REFERENCE:
-            steps.extend([
-                "Locate the exact line where the null/undefined access occurs.",
-                "Check the initialization of the object being accessed.",
-                "Verify if a previous function call returned null unexpectedly."
-            ])
+            steps.extend(
+                [
+                    "Locate the exact line where the null/undefined access occurs.",
+                    "Check the initialization of the object being accessed.",
+                    "Verify if a previous function call returned null unexpectedly.",
+                ]
+            )
         elif context.errorType == ErrorType.SYNTAX_ERROR:
-            steps.extend([
-                "Check for missing delimiters (brackets, quotes, parentheses).",
-                "Verify indentation levels (especially for Python).",
-                "Check for accidental use of reserved keywords."
-            ])
-        
+            steps.extend(
+                [
+                    "Check for missing delimiters (brackets, quotes, parentheses).",
+                    "Verify indentation levels (especially for Python).",
+                    "Check for accidental use of reserved keywords.",
+                ]
+            )
+
         # Framework specific
         if context.framework == "React":
             steps.append("Verify you aren't calling hooks inside loops or conditions.")
         elif context.framework == "Django":
             steps.append("Check if your model migrations are up to date.")
-            
+
         if not steps:
             steps.append("Reproduce the error with the minimal amount of code possible.")
             steps.append("Add print/log statements around the suspected failure point.")
-            
+
         return steps
 
     def _generate_search_queries(self, context: ProgrammingContext, query: str) -> dict[str, str]:
@@ -130,42 +136,42 @@ class DynamicResearchPlanner:
         lang = context.language.value if context.language != ProgrammingLanguage.UNKNOWN else ""
         error = context.errorMessage or ""
         framework = context.framework or ""
-        
+
         # Clean query for search
-        base_query = query.replace("```", "").strip()
-        
+        query.replace("```", "").strip()
+
         # StackOverflow query
         so_query = f"[{lang}] {error}" if lang else error
         if framework:
             so_query = f"[{framework.lower()}] {so_query}"
         queries["StackOverflow"] = so_query.strip()
-        
+
         # GitHub Issues query
         if framework or lang:
             queries["GitHub Issues"] = f"is:issue {framework or lang} {error}".strip()
-            
+
         # Documentation query
         if framework:
             queries["Official Docs"] = f"{framework} {context.errorType.value} documentation".strip()
         elif lang:
             queries["Official Docs"] = f"{lang} {context.errorType.value} manual".strip()
-            
+
         return queries
 
     def _identify_key_concepts(self, context: ProgrammingContext) -> list[str]:
         concepts = []
-        
+
         if context.errorType == ErrorType.NULL_REFERENCE:
             concepts.extend(["Null Safety", "Optional Chaining", "Defensive Programming"])
         elif context.errorType == ErrorType.MEMORY_ERROR:
             concepts.extend(["Memory Leak", "Garbage Collection", "Heap vs Stack"])
         elif context.errorType == ErrorType.IMPORT_ERROR:
             concepts.extend(["Dependency Management", "Module Resolution", "Virtual Environments"])
-            
+
         if context.framework == "React":
             concepts.append("React Lifecycle")
             concepts.append("Hook Rules")
-            
+
         return concepts
 
 
@@ -418,9 +424,7 @@ class DeveloperAssistanceEngine:
 
         # Add recommended resources based on language
         if programming_context.language in self.language_resources:
-            response.recommended_resources = self.language_resources[
-                programming_context.language
-            ]
+            response.recommended_resources = self.language_resources[programming_context.language]
 
         # Add language-specific suggestions
         response.suggestions.extend(self._get_language_specific_suggestions(programming_context))
@@ -481,96 +485,108 @@ class DeveloperAssistanceEngine:
         suggestions = []
 
         if context.language == ProgrammingLanguage.PYTHON:
-            suggestions.extend([
-                DebuggingSuggestion(
-                    title="Use Python Debugger (pdb)",
-                    description="Insert breakpoints and step through code",
-                    priority=2,
-                    category="investigation",
-                    code_example="import pdb; pdb.set_trace()\n# Or use: breakpoint() in Python 3.7+",
-                ),
-                DebuggingSuggestion(
-                    title="Check Python Version",
-                    description="Ensure you're using the correct Python version",
-                    priority=3,
-                    category="investigation",
-                    code_example="python --version\npython3 --version",
-                ),
-            ])
+            suggestions.extend(
+                [
+                    DebuggingSuggestion(
+                        title="Use Python Debugger (pdb)",
+                        description="Insert breakpoints and step through code",
+                        priority=2,
+                        category="investigation",
+                        code_example="import pdb; pdb.set_trace()\n# Or use: breakpoint() in Python 3.7+",
+                    ),
+                    DebuggingSuggestion(
+                        title="Check Python Version",
+                        description="Ensure you're using the correct Python version",
+                        priority=3,
+                        category="investigation",
+                        code_example="python --version\npython3 --version",
+                    ),
+                ]
+            )
         elif context.language == ProgrammingLanguage.JAVASCRIPT:
-            suggestions.extend([
-                DebuggingSuggestion(
-                    title="Use Browser DevTools",
-                    description="Open console and use debugger statements",
-                    priority=1,
-                    category="investigation",
-                    code_example="debugger; // Add in code\n// Or use console.log()",
-                ),
-                DebuggingSuggestion(
-                    title="Check Node Version",
-                    description="Ensure Node.js version is compatible",
-                    priority=3,
-                    category="investigation",
-                    code_example="node --version\nnpm --version",
-                ),
-            ])
+            suggestions.extend(
+                [
+                    DebuggingSuggestion(
+                        title="Use Browser DevTools",
+                        description="Open console and use debugger statements",
+                        priority=1,
+                        category="investigation",
+                        code_example="debugger; // Add in code\n// Or use console.log()",
+                    ),
+                    DebuggingSuggestion(
+                        title="Check Node Version",
+                        description="Ensure Node.js version is compatible",
+                        priority=3,
+                        category="investigation",
+                        code_example="node --version\nnpm --version",
+                    ),
+                ]
+            )
         elif context.language == ProgrammingLanguage.JAVA:
-            suggestions.extend([
-                DebuggingSuggestion(
-                    title="Use Java Debugger (jdb)",
-                    description="Debug Java applications from command line",
-                    priority=2,
-                    category="investigation",
-                ),
-                DebuggingSuggestion(
-                    title="Check Stack Trace",
-                    description="Java exceptions include detailed stack traces",
-                    priority=1,
-                    category="investigation",
-                ),
-            ])
+            suggestions.extend(
+                [
+                    DebuggingSuggestion(
+                        title="Use Java Debugger (jdb)",
+                        description="Debug Java applications from command line",
+                        priority=2,
+                        category="investigation",
+                    ),
+                    DebuggingSuggestion(
+                        title="Check Stack Trace",
+                        description="Java exceptions include detailed stack traces",
+                        priority=1,
+                        category="investigation",
+                    ),
+                ]
+            )
         elif context.language == ProgrammingLanguage.CPP:
-            suggestions.extend([
-                DebuggingSuggestion(
-                    title="Use GDB Debugger",
-                    description="GNU Debugger for C/C++",
-                    priority=1,
-                    category="investigation",
-                    code_example="g++ -g program.cpp -o program\ngdb ./program",
-                ),
-                DebuggingSuggestion(
-                    title="Check Compilation Warnings",
-                    description="Enable all warnings during compilation",
-                    priority=2,
-                    category="prevention",
-                    code_example="g++ -Wall -Wextra -pedantic program.cpp",
-                ),
-            ])
+            suggestions.extend(
+                [
+                    DebuggingSuggestion(
+                        title="Use GDB Debugger",
+                        description="GNU Debugger for C/C++",
+                        priority=1,
+                        category="investigation",
+                        code_example="g++ -g program.cpp -o program\ngdb ./program",
+                    ),
+                    DebuggingSuggestion(
+                        title="Check Compilation Warnings",
+                        description="Enable all warnings during compilation",
+                        priority=2,
+                        category="prevention",
+                        code_example="g++ -Wall -Wextra -pedantic program.cpp",
+                    ),
+                ]
+            )
         elif context.language == ProgrammingLanguage.GO:
-            suggestions.extend([
-                DebuggingSuggestion(
-                    title="Use Go Debugger (delve)",
-                    description="Delve is a debugger for Go",
-                    priority=1,
-                    category="investigation",
-                    code_example="go install github.com/go-delve/delve/cmd/dlv@latest\ndlv debug",
-                ),
-            ])
+            suggestions.extend(
+                [
+                    DebuggingSuggestion(
+                        title="Use Go Debugger (delve)",
+                        description="Delve is a debugger for Go",
+                        priority=1,
+                        category="investigation",
+                        code_example="go install github.com/go-delve/delve/cmd/dlv@latest\ndlv debug",
+                    ),
+                ]
+            )
         elif context.language == ProgrammingLanguage.RUST:
-            suggestions.extend([
-                DebuggingSuggestion(
-                    title="Read Compiler Errors Carefully",
-                    description="Rust compiler errors are very detailed and helpful",
-                    priority=1,
-                    category="investigation",
-                ),
-                DebuggingSuggestion(
-                    title="Use Rust Analyzer",
-                    description="IDE extension with real-time error checking",
-                    priority=2,
-                    category="prevention",
-                ),
-            ])
+            suggestions.extend(
+                [
+                    DebuggingSuggestion(
+                        title="Read Compiler Errors Carefully",
+                        description="Rust compiler errors are very detailed and helpful",
+                        priority=1,
+                        category="investigation",
+                    ),
+                    DebuggingSuggestion(
+                        title="Use Rust Analyzer",
+                        description="IDE extension with real-time error checking",
+                        priority=2,
+                        category="prevention",
+                    ),
+                ]
+            )
 
         return suggestions
 

@@ -34,7 +34,6 @@ from core.schema import (
     UseCase,
 )
 from extraction.programming_error_detector import (
-    ProgrammingIntentExtractor,
     get_programming_intent_extractor,
 )
 
@@ -520,14 +519,16 @@ class IntentExtractor:
         # Check if this is a programming-related query
         programming_extractor = get_programming_intent_extractor()
         is_programming, prog_confidence = programming_extractor.is_programming_query(text)
-        
+
         programming_context = None
         if is_programming:
             logger.info(f"Programming query detected (confidence: {prog_confidence:.2f})")
             programming_context = programming_extractor.extract_programming_context(text)
-            logger.info(f"Extracted programming context: language={programming_context.language.value}, "
-                       f"error_type={programming_context.errorType.value}, "
-                       f"has_stack_trace={programming_context.hasStackTrace}")
+            logger.info(
+                f"Extracted programming context: language={programming_context.language.value}, "
+                f"error_type={programming_context.errorType.value}, "
+                f"has_stack_trace={programming_context.hasStackTrace}"
+            )
 
         # Phase 1: Constraint Extraction (Regex patterns)
         constraints = self.constraint_extractor.extract_constraints(text)
@@ -535,7 +536,7 @@ class IntentExtractor:
 
         # Phase 2: Goal Classification (Keyword matching)
         goal = self.goal_classifier.classify_goal(text)
-        
+
         # Override goal if programming query detected
         if is_programming and programming_context:
             goal = programming_extractor.get_intent_goal(text)
@@ -549,7 +550,7 @@ class IntentExtractor:
         ethical_signals = self.semantic_engine.infer_ethical_signals(text)
         result_type = self.semantic_engine.infer_result_type(text)
         complexity = self.semantic_engine.infer_complexity(text)
-        
+
         # Add programming-specific use cases
         if is_programming and programming_context:
             programming_use_cases = programming_extractor.get_use_cases(programming_context)

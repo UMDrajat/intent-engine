@@ -22,6 +22,7 @@ from functools import lru_cache
 from typing import Any
 
 from core.schema import UniversalIntent
+from extraction.developer_assistance import get_developer_assistance_engine
 from extraction.extractor import IntentExtractionRequest, extract_intent
 from models import (
     ExtractedIntent,
@@ -37,7 +38,6 @@ from searxng.query_router import (
 from searxng.query_router import (
     get_query_router,
 )
-from extraction.developer_assistance import get_developer_assistance_engine
 from searxng.result_aggregator import AggregatedResult, get_result_aggregator
 
 logger = logging.getLogger(__name__)
@@ -290,7 +290,7 @@ class UnifiedSearchService:
         # Handle programming context
         programming_context_dict = None
         research_plan_dict = None
-        
+
         if inferred and hasattr(inferred, "programmingContext") and inferred.programmingContext:
             ctx = inferred.programmingContext
             programming_context_dict = {
@@ -300,9 +300,9 @@ class UnifiedSearchService:
                 "errorMessage": ctx.errorMessage,
                 "framework": ctx.framework,
                 "confidence": ctx.confidence,
-                "hasStackTrace": ctx.hasStackTrace
+                "hasStackTrace": ctx.hasStackTrace,
             }
-            
+
             # Generate research plan using developer assistance engine
             try:
                 engine = get_developer_assistance_engine()
@@ -312,7 +312,7 @@ class UnifiedSearchService:
                     research_plan_dict = {
                         "investigation_steps": rp.investigation_steps,
                         "optimized_search_queries": rp.optimized_search_queries,
-                        "key_concepts": rp.key_concepts
+                        "key_concepts": rp.key_concepts,
                     }
             except Exception as e:
                 logger.warning(f"Failed to generate research plan: {e}")
@@ -332,7 +332,7 @@ class UnifiedSearchService:
             complexity=(inferred.complexity.value if inferred and inferred.complexity else "moderate"),
             confidence=0.8,  # Default confidence
             programming_context=programming_context_dict,
-            research_plan=research_plan_dict
+            research_plan=research_plan_dict,
         )
 
     async def _search_searxng(self, request: UnifiedSearchRequest) -> list[SearXNGResult]:

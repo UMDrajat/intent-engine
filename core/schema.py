@@ -48,7 +48,7 @@ class UseCase(Enum):
     COMMUNITY_ENGAGEMENT = "community_engagement"
     PROFESSIONAL_DEVELOPMENT = "professional_development"
     MARKET_RESEARCH = "market_research"
-    
+
     # Programming & Development
     DEBUGGING = "debugging"
     CODE_FIX = "code_fix"
@@ -115,7 +115,7 @@ class ResultType(Enum):
     TOOL = "tool"
     MARKETPLACE = "marketplace"
     COMMUNITY = "community"
-    
+
     # Programming-specific
     CODE_SNIPPET = "code_snippet"
     DOCUMENTATION = "documentation"
@@ -139,6 +139,7 @@ class ContentType(Enum):
 
 class ProgrammingLanguage(Enum):
     """Common programming languages for intent extraction"""
+
     PYTHON = "python"
     JAVASCRIPT = "javascript"
     TYPESCRIPT = "typescript"
@@ -161,6 +162,7 @@ class ProgrammingLanguage(Enum):
 
 class ErrorType(Enum):
     """Types of programming errors"""
+
     SYNTAX_ERROR = "syntax_error"
     RUNTIME_ERROR = "runtime_error"
     TYPE_ERROR = "type_error"
@@ -220,7 +222,7 @@ class MeetingContext:
 @dataclass
 class ProgrammingContext:
     """Context for programming-related queries"""
-    
+
     language: ProgrammingLanguage = ProgrammingLanguage.UNKNOWN
     errorType: ErrorType = ErrorType.UNKNOWN
     errorCode: str | None = None  # e.g., "E0301", "TS2304"

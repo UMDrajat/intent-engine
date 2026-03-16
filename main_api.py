@@ -591,7 +591,7 @@ async def health_check(db: Session = Depends(get_db)):
     if "localhost" in searxng_url and os.getenv("KUBERNETES_SERVICE_HOST"):
         # If in K8s/Docker and URL is localhost, try service name instead
         searxng_url = "http://searxng:8080"
-    
+
     try:
         import aiohttp
 

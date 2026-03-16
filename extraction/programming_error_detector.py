@@ -238,7 +238,7 @@ class ProgrammingLanguageDetector:
                     r"\brequire\s+['\"]",
                     r"\byield\b",
                     r"\battr_accessor\b",
-                    r"\|\w+\|", # Blocks
+                    r"\|\w+\|",  # Blocks
                 ],
                 "error_prefixes": [
                     "NoMethodError:",
@@ -277,7 +277,7 @@ class ProgrammingLanguageDetector:
                     r"\bdata\s+class\b",
                     r"\bobject\s+\w+",
                     r"\bsuspend\s+fun\b",
-                    r"\?.", # Null safety
+                    r"\?.",  # Null safety
                 ],
                 "error_prefixes": [
                     "Exception in thread",
@@ -450,9 +450,7 @@ class ErrorMessageParser:
         # Compile patterns
         self.compiled_patterns = {}
         for error_type, patterns in self.error_patterns.items():
-            self.compiled_patterns[error_type] = [
-                re.compile(p, re.IGNORECASE) for p in patterns
-            ]
+            self.compiled_patterns[error_type] = [re.compile(p, re.IGNORECASE) for p in patterns]
 
         # Error code patterns
         self.error_code_patterns = [
@@ -604,7 +602,14 @@ class ProgrammingIntentExtractor:
         # Framework-specific patterns
         self.framework_patterns = {
             "React": [r"\bReact\b", r"\buseState\b", r"\beffect\b", r"\bJSX\b", r"render\s*\(", r"\bComponent\b"],
-            "Django": [r"\bDjango\b", r"\bmodels\.Model\b", r"\burls\.py\b", r"\bviews\.py\b", r"\bmanage\.py\b", r"\{\{\s*[\w.]+\s*\}\}"],
+            "Django": [
+                r"\bDjango\b",
+                r"\bmodels\.Model\b",
+                r"\burls\.py\b",
+                r"\bviews\.py\b",
+                r"\bmanage\.py\b",
+                r"\{\{\s*[\w.]+\s*\}\}",
+            ],
             "FastAPI": [r"\bFastAPI\b", r"@app\.\w+\s*\(", r"Pydantic", r"uvicorn", r"async\s+def\b"],
             "Flask": [r"\bFlask\b", r"@app\.route\b", r"render_template", r"flask\s+run"],
             "Spring Boot": [r"@SpringBootApplication", r"@RestController", r"@Autowired", r"Spring\s*Boot"],
@@ -615,8 +620,7 @@ class ProgrammingIntentExtractor:
             "Vue": [r"\bVue\b", r"v-if", r"v-for", r"v-bind", r"v-model", r"computed\s*:"],
         }
         self.compiled_frameworks = {
-            name: [re.compile(p, re.IGNORECASE) for p in patterns]
-            for name, patterns in self.framework_patterns.items()
+            name: [re.compile(p, re.IGNORECASE) for p in patterns] for name, patterns in self.framework_patterns.items()
         }
 
         # Programming-specific keywords
@@ -632,9 +636,7 @@ class ProgrammingIntentExtractor:
         ]
 
         # Compile patterns
-        self.compiled_keywords = [
-            re.compile(p, re.IGNORECASE) for p in self.programming_keywords
-        ]
+        self.compiled_keywords = [re.compile(p, re.IGNORECASE) for p in self.programming_keywords]
 
     def is_programming_query(self, text: str) -> tuple[bool, float]:
         """
@@ -655,9 +657,7 @@ class ProgrammingIntentExtractor:
             return True, error_analysis["confidence"]
 
         # Check for programming keywords
-        keyword_matches = sum(
-            1 for pattern in self.compiled_keywords if pattern.search(text)
-        )
+        keyword_matches = sum(1 for pattern in self.compiled_keywords if pattern.search(text))
 
         # Check for programming language
         lang, lang_confidence = self.language_detector.detect_language(text)
@@ -743,31 +743,19 @@ class ProgrammingIntentExtractor:
         text_lower = text.lower()
 
         # Check for error/exception keywords
-        if any(
-            kw in text_lower
-            for kw in ["error", "exception", "bug", "not working", "broken", "fix"]
-        ):
+        if any(kw in text_lower for kw in ["error", "exception", "bug", "not working", "broken", "fix"]):
             return IntentGoal.PROGRAMMING_ERROR
 
         # Check for debugging keywords
-        if any(
-            kw in text_lower
-            for kw in ["debug", "debugging", "trace", "breakpoint", "step through"]
-        ):
+        if any(kw in text_lower for kw in ["debug", "debugging", "trace", "breakpoint", "step through"]):
             return IntentGoal.CODE_DEBUG
 
         # Check for code review keywords
-        if any(
-            kw in text_lower
-            for kw in ["review", "optimize", "refactor", "improve", "best practice"]
-        ):
+        if any(kw in text_lower for kw in ["review", "optimize", "refactor", "improve", "best practice"]):
             return IntentGoal.CODE_REVIEW
 
         # Check for API integration keywords
-        if any(
-            kw in text_lower
-            for kw in ["api", "integration", "connect", "endpoint", "rest", "graphql"]
-        ):
+        if any(kw in text_lower for kw in ["api", "integration", "connect", "endpoint", "rest", "graphql"]):
             return IntentGoal.API_INTEGRATION
 
         # Default to troubleshooting for programming queries
