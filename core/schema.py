@@ -32,6 +32,12 @@ class IntentGoal(Enum):
     CREATE = "create"
     REFLECT = "reflect"  # Diary
 
+    # Programming & Development
+    PROGRAMMING_ERROR = "programming_error"
+    CODE_DEBUG = "code_debug"
+    CODE_REVIEW = "code_review"
+    API_INTEGRATION = "api_integration"
+
 
 class UseCase(Enum):
     COMPARISON = "comparison"
@@ -42,6 +48,13 @@ class UseCase(Enum):
     COMMUNITY_ENGAGEMENT = "community_engagement"
     PROFESSIONAL_DEVELOPMENT = "professional_development"
     MARKET_RESEARCH = "market_research"
+    
+    # Programming & Development
+    DEBUGGING = "debugging"
+    CODE_FIX = "code_fix"
+    ERROR_RESOLUTION = "error_resolution"
+    CODE_OPTIMIZATION = "code_optimization"
+    LEARNING_TO_CODE = "learning_to_code"
 
 
 class ConstraintType(Enum):
@@ -102,6 +115,13 @@ class ResultType(Enum):
     TOOL = "tool"
     MARKETPLACE = "marketplace"
     COMMUNITY = "community"
+    
+    # Programming-specific
+    CODE_SNIPPET = "code_snippet"
+    DOCUMENTATION = "documentation"
+    STACK_OVERFLOW = "stack_overflow"
+    GITHUB_REPO = "github_repo"
+    API_REFERENCE = "api_reference"
 
 
 class Complexity(Enum):
@@ -115,6 +135,45 @@ class ContentType(Enum):
     SPREADSHEET = "spreadsheet"
     PRESENTATION = "presentation"
     FORM = "form"
+
+
+class ProgrammingLanguage(Enum):
+    """Common programming languages for intent extraction"""
+    PYTHON = "python"
+    JAVASCRIPT = "javascript"
+    TYPESCRIPT = "typescript"
+    JAVA = "java"
+    C_SHARP = "csharp"
+    CPP = "cpp"
+    C = "c"
+    GO = "go"
+    RUST = "rust"
+    RUBY = "ruby"
+    PHP = "php"
+    SWIFT = "swift"
+    KOTLIN = "kotlin"
+    SQL = "sql"
+    SHELL = "shell"
+    HTML = "html"
+    CSS = "css"
+    UNKNOWN = "unknown"
+
+
+class ErrorType(Enum):
+    """Types of programming errors"""
+    SYNTAX_ERROR = "syntax_error"
+    RUNTIME_ERROR = "runtime_error"
+    TYPE_ERROR = "type_error"
+    NULL_REFERENCE = "null_reference"
+    IMPORT_ERROR = "import_error"
+    AUTHENTICATION_ERROR = "authentication_error"
+    NETWORK_ERROR = "network_error"
+    DATABASE_ERROR = "database_error"
+    API_ERROR = "api_error"
+    COMPILATION_ERROR = "compilation_error"
+    MEMORY_ERROR = "memory_error"
+    PERMISSION_ERROR = "permission_error"
+    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -159,6 +218,26 @@ class MeetingContext:
 
 
 @dataclass
+class ProgrammingContext:
+    """Context for programming-related queries"""
+    
+    language: ProgrammingLanguage = ProgrammingLanguage.UNKNOWN
+    errorType: ErrorType = ErrorType.UNKNOWN
+    errorCode: str | None = None  # e.g., "E0301", "TS2304"
+    errorMessage: str | None = None  # e.g., "NameError: name 'x' is not defined"
+    stackTrace: str | None = None  # Full or partial stack trace
+    codeSnippet: str | None = None  # Code snippet from the query
+    lineNumber: int | None = None  # Line number where error occurred
+    fileName: str | None = None  # File name from error
+    framework: str | None = None  # e.g., "Django", "React", "Spring"
+    library: str | None = None  # e.g., "pandas", "lodash", "requests"
+    isCompilationError: bool = False
+    isRuntimeError: bool = False
+    hasStackTrace: bool = False
+    confidence: float = 0.0  # Confidence that this is a programming error
+
+
+@dataclass
 class EthicalSignal:
     """Ethical preferences extracted from intent"""
 
@@ -187,6 +266,7 @@ class InferredIntent:
     temporalIntent: TemporalIntent | None = None
     documentContext: DocumentContext | None = None  # From open docs/emails
     meetingContext: MeetingContext | None = None  # From calendar/Meet
+    programmingContext: ProgrammingContext | None = None  # From programming queries
     resultType: ResultType | None = None
     complexity: Complexity = Complexity.MODERATE
     ethicalSignals: list[EthicalSignal] = field(default_factory=list)  # Privacy, sustainability, etc.

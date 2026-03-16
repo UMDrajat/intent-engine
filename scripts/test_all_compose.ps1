@@ -11,6 +11,11 @@
 #   .\scripts\test_all_compose.ps1 -TestSuite full
 # =============================================================================
 
+param(
+    [ValidateSet("validate", "health", "api", "full")]
+    [string]$TestSuite = "full"
+)
+
 $ErrorActionPreference = "Continue"
 
 # Configuration
@@ -376,13 +381,8 @@ function Print-Summary {
 }
 
 # =============================================================================
-# Main
+# Execution
 # =============================================================================
-
-param(
-    [ValidateSet("validate", "health", "api", "full")]
-    [string]$TestSuite = "full"
-)
 
 Print-Header "INTENT ENGINE - DOCKER COMPOSE TEST SUITE"
 Write-Host "Project Directory: $ProjectDir"

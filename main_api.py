@@ -587,17 +587,39 @@ async def health_check(db: Session = Depends(get_db)):
         logger.debug("Redis not configured, skipping health check")
 
     # Check SearXNG connectivity (optional)
-    searxng_url = os.getenv("SEARXNG_URL", "http://localhost:8080")
+    searxng_url = os.getenv("SEARXNG_BASE_URL") or os.getenv("SEARXNG_URL", "http://searxng:8080")
+    if "localhost" in searxng_url and os.getenv("KUBERNETES_SERVICE_HOST"):
+        # If in K8s/Docker and URL is localhost, try service name instead
+        searxng_url = "http://searxng:8080"
+    
     try:
         import aiohttp
 
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
-            async with session.get(f"{searxng_url}/healthz", raise_for_status=False) as response:
-                if response.status == 200:
-                    logger.debug("SearXNG health check: OK")
+            # Try configured URL
+            try:
+                async with session.get(f"{searxng_url}/healthz", raise_for_status=False) as response:
+                    if response.status == 200:
+                        logger.debug(f"SearXNG health check ({searxng_url}): OK")
+                    else:
+                        raise Exception(f"Status {response.status}")
+            except Exception as e:
+                # Try localhost fallback if not already localhost
+                if "localhost" not in searxng_url:
+                    try:
+                        async with session.get("http://localhost:8080/healthz", raise_for_status=False) as resp:
+                            if resp.status == 200:
+                                logger.debug("SearXNG health check (localhost fallback): OK")
+                            else:
+                                raise Exception(f"Status {resp.status}")
+                    except:
+                        checks["searxng"] = False
+                        logger.warning(f"SearXNG health check failed for {searxng_url}: {e}")
+                        if overall_status == "healthy":
+                            overall_status = "degraded"
                 else:
                     checks["searxng"] = False
-                    logger.warning(f"SearXNG health check returned status: {response.status}")
+                    logger.warning(f"SearXNG health check failed for {searxng_url}: {e}")
                     if overall_status == "healthy":
                         overall_status = "degraded"
     except ImportError:

@@ -37,6 +37,7 @@ from searxng.query_router import (
 from searxng.query_router import (
     get_query_router,
 )
+from extraction.developer_assistance import get_developer_assistance_engine
 from searxng.result_aggregator import AggregatedResult, get_result_aggregator
 
 logger = logging.getLogger(__name__)
@@ -286,6 +287,36 @@ class UnifiedSearchService:
         if constraints_list is None:
             constraints_list = []
 
+        # Handle programming context
+        programming_context_dict = None
+        research_plan_dict = None
+        
+        if inferred and hasattr(inferred, "programmingContext") and inferred.programmingContext:
+            ctx = inferred.programmingContext
+            programming_context_dict = {
+                "language": ctx.language.value if hasattr(ctx.language, "value") else str(ctx.language),
+                "errorType": ctx.errorType.value if hasattr(ctx.errorType, "value") else str(ctx.errorType),
+                "errorCode": ctx.errorCode,
+                "errorMessage": ctx.errorMessage,
+                "framework": ctx.framework,
+                "confidence": ctx.confidence,
+                "hasStackTrace": ctx.hasStackTrace
+            }
+            
+            # Generate research plan using developer assistance engine
+            try:
+                engine = get_developer_assistance_engine()
+                assistance = engine.generate_assistance_response(universal_intent)
+                if assistance.research_plan:
+                    rp = assistance.research_plan
+                    research_plan_dict = {
+                        "investigation_steps": rp.investigation_steps,
+                        "optimized_search_queries": rp.optimized_search_queries,
+                        "key_concepts": rp.key_concepts
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to generate research plan: {e}")
+
         return ExtractedIntent(
             goal=(declared.goal.value if declared and declared.goal else "unknown"),
             constraints=[
@@ -296,10 +327,12 @@ class UnifiedSearchService:
                 }
                 for c in constraints_list
             ],
-            use_cases=[uc.value for uc in use_cases_list],
+            use_cases=[uc.value if hasattr(uc, "value") else str(uc) for uc in use_cases_list],
             result_type=(inferred.resultType.value if inferred and inferred.resultType else "unknown"),
             complexity=(inferred.complexity.value if inferred and inferred.complexity else "moderate"),
             confidence=0.8,  # Default confidence
+            programming_context=programming_context_dict,
+            research_plan=research_plan_dict
         )
 
     async def _search_searxng(self, request: UnifiedSearchRequest) -> list[SearXNGResult]:

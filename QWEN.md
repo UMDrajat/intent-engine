@@ -4,7 +4,7 @@
 
 The **Intent Engine** is a privacy-first, intent-driven system for search, service recommendation, and ad matching. It processes user queries to extract structured intent while respecting privacy and ethical considerations, without discriminatory targeting or user tracking.
 
-**Version:** 0.3.0  
+**Version:** 2.0.0 (Self-Improving Search Loop)  
 **Repository:** https://github.com/itxLikhith/intent-engine  
 **Docker Image:** `anony45/intent-engine-api:latest`
 
@@ -26,8 +26,7 @@ The **Intent Engine** is a privacy-first, intent-driven system for search, servi
 - **Advanced Constraint Handling** - Supports range (`0-500`), comparison (`<=500`), min/max formats
 - **Web Intent Extraction** - Automatic intent tagging for crawled web content
 - **Vector Search** - Qdrant integration for semantic search (optional)
-- **Event Streaming** - Kafka/Redpanda integration for real-time analytics (optional)
-- **Distributed Tracing** - OpenTelemetry + Jaeger for observability (optional)
+- **Redis Caching** - 11x faster search with 1h TTL caching
 - **Service Recommendation** - Routes users to appropriate services based on intent
 - **Ethical Ad Matching** - Fair ad matching with fairness validation
 - **Campaign Management** - Full advertising campaign lifecycle with budget tracking
@@ -57,8 +56,6 @@ The **Intent Engine** is a privacy-first, intent-driven system for search, servi
 - **SearXNG** - Privacy-focused metasearch engine
 - **Go Crawler** - High-performance web crawler and indexer (Go-based)
 - **Qdrant** - Vector database for semantic search (optional)
-- **Redpanda/Kafka** - Message broker for event streaming (optional)
-- **Jaeger** - Distributed tracing (optional)
 - **Prometheus** - Metrics collection
 - **Grafana** - Dashboards and visualization
 - **ARQ** - Background task queue
@@ -105,7 +102,6 @@ intent-engine/
 │   ├── query_router.py     # Intent-based query routing
 │   ├── result_aggregator.py # Result deduplication
 │   ├── topic_expander.py   # Topic discovery
-│   ├── scheduled_seed_discovery.py # Seed URL discovery
 │   └── unified_search.py   # Unified search service
 ├── services/               # Service recommendation
 ├── scripts/                # Utility scripts

@@ -129,15 +129,18 @@ class UnifiedQueryRouter:
         temporal = intent.inferred.temporalIntent if intent.inferred else None
         ethical_signals = intent.inferred.ethicalSignals if intent.inferred else []
 
-        # Rule 1: Troubleshooting → prefer community discussions (SearXNG)
-        if goal == IntentGoal.TROUBLESHOOTING:
-            logger.debug("Routing troubleshooting query to SearXNG")
+        # Rule 1: Troubleshooting & Programming Errors → SearXNG (community discussions) + Go Crawler
+        if goal in [IntentGoal.TROUBLESHOOTING, IntentGoal.PROGRAMMING_ERROR, IntentGoal.CODE_DEBUG]:
+            logger.debug(f"Routing {goal.value} query to hybrid backends")
             return QueryRoute(
-                backends=[SearchBackend.SEARXNG],
-                weights={SearchBackend.SEARXNG: 1.0},
-                parallel=False,
-                timeout_ms=3000,
-                fallback_chain=[SearchBackend.GO_CRAWLER],
+                backends=[SearchBackend.SEARXNG, SearchBackend.GO_CRAWLER],
+                weights={
+                    SearchBackend.SEARXNG: 0.7,
+                    SearchBackend.GO_CRAWLER: 0.3,
+                },
+                parallel=True,
+                timeout_ms=5000,
+                fallback_chain=[SearchBackend.SEARXNG, SearchBackend.GO_CRAWLER],
                 max_results_per_backend=self.default_max_results,
             )
 
@@ -266,9 +269,12 @@ class UnifiedQueryRouter:
             for backend, task in tasks:
                 try:
                     result = await asyncio.wait_for(task, timeout=route.timeout_ms / 1000)
-                    results.extend(result)
-                    logger.debug(f"Backend {backend.value} returned {len(result)} results")
-                    break  # Success, don't try fallback
+                    if result:
+                        results.extend(result)
+                        logger.debug(f"Backend {backend.value} returned {len(result)} results")
+                        break  # Found results, stop fallback
+                    else:
+                        logger.debug(f"Backend {backend.value} returned no results, trying fallback")
                 except TimeoutError:
                     logger.warning(f"Backend {backend.value} timed out")
                     continue

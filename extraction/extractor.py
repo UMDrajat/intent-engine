@@ -22,6 +22,7 @@ from core.schema import (
     IntentExtractionRequest,
     IntentExtractionResponse,
     IntentGoal,
+    ProgrammingContext,
     Recency,
     ResultType,
     SessionFeedback,
@@ -31,6 +32,10 @@ from core.schema import (
     UniversalIntent,
     Urgency,
     UseCase,
+)
+from extraction.programming_error_detector import (
+    ProgrammingIntentExtractor,
+    get_programming_intent_extractor,
 )
 
 # Configure logging
@@ -251,6 +256,35 @@ class GoalClassifier:
             IntentGoal.NAVIGATION: [
                 r"\b(go to|navigate to|directions|route|map|find location|address)\b",
                 r"\b(directions|route|navigate|location|address|find the way)\b",
+            ],
+            IntentGoal.PROGRAMMING_ERROR: [
+                # Programming error patterns
+                r"\b(error|exception|bug|issue)\s+(in|with|on)\s+\w+",
+                r"\b\w+\s+(error|exception|bug)\b",
+                r"Traceback\s+\(most recent call last\)",
+                r"\bat\s+\S+\s+\([^)]+\)",  # Stack trace lines
+                r"\b(NameError|TypeError|ValueError|IndexError|KeyError|AttributeError)\b",
+                r"\b(ImportError|ModuleNotFoundError|SyntaxError|RuntimeError)\b",
+                r"\b(NullPointerException|RuntimeException|IOException)\b",
+                r"\b(segmentation fault|core dumped)\b",
+                r"\bundefined reference to\b",
+                r"\bfatal error\b",
+            ],
+            IntentGoal.CODE_DEBUG: [
+                r"\b(debug|debugging|debugger)\b",
+                r"\bbreakpoint\b",
+                r"\bstep through\b",
+                r"\binspect variable\b",
+            ],
+            IntentGoal.CODE_REVIEW: [
+                r"\b(code review|review code|optimize|refactor)\b",
+                r"\bbest practice\b",
+                r"\bcode quality\b",
+            ],
+            IntentGoal.API_INTEGRATION: [
+                r"\b(api|endpoint|rest|graphql)\s+(integration|connect|call)\b",
+                r"\bintegrate with\b",
+                r"\bauthentication\s+(token|oauth|api)\b",
             ],
         }
 
@@ -483,12 +517,29 @@ class IntentExtractor:
         session_id = getattr(request.context, "sessionId", None) or f"sess_{uuid.uuid4().hex}"
         user_locale = getattr(request.context, "userLocale", "en-US")
 
+        # Check if this is a programming-related query
+        programming_extractor = get_programming_intent_extractor()
+        is_programming, prog_confidence = programming_extractor.is_programming_query(text)
+        
+        programming_context = None
+        if is_programming:
+            logger.info(f"Programming query detected (confidence: {prog_confidence:.2f})")
+            programming_context = programming_extractor.extract_programming_context(text)
+            logger.info(f"Extracted programming context: language={programming_context.language.value}, "
+                       f"error_type={programming_context.errorType.value}, "
+                       f"has_stack_trace={programming_context.hasStackTrace}")
+
         # Phase 1: Constraint Extraction (Regex patterns)
         constraints = self.constraint_extractor.extract_constraints(text)
         negative_preferences = self.constraint_extractor.extract_negative_preferences(text)
 
         # Phase 2: Goal Classification (Keyword matching)
         goal = self.goal_classifier.classify_goal(text)
+        
+        # Override goal if programming query detected
+        if is_programming and programming_context:
+            goal = programming_extractor.get_intent_goal(text)
+            logger.info(f"Programming intent goal: {goal.value}")
 
         # Phase 3: Skill Level Detection
         skill_level = self.skill_detector.detect_skill_level(text)
@@ -498,6 +549,14 @@ class IntentExtractor:
         ethical_signals = self.semantic_engine.infer_ethical_signals(text)
         result_type = self.semantic_engine.infer_result_type(text)
         complexity = self.semantic_engine.infer_complexity(text)
+        
+        # Add programming-specific use cases
+        if is_programming and programming_context:
+            programming_use_cases = programming_extractor.get_use_cases(programming_context)
+            # Merge with existing use cases, avoiding duplicates
+            for uc in programming_use_cases:
+                if uc not in use_cases:
+                    use_cases.append(uc)
 
         # Determine urgency based on keywords
         urgency = self._infer_urgency(text)
@@ -521,6 +580,7 @@ class IntentExtractor:
             result_type=result_type,
             complexity=complexity,
             ethical_signals=ethical_signals,
+            programming_context=programming_context,
         )
 
         # Create response with metrics
@@ -529,7 +589,9 @@ class IntentExtractor:
             extractionMetrics={
                 "confidence": 0.8,  # Placeholder confidence
                 "extractedDimensions": [c.dimension for c in constraints] + (["goal"] if goal else []),
-                "warnings": [],  # Add warnings if needed
+                "warnings": [],
+                "isProgrammingQuery": is_programming,
+                "programmingConfidence": prog_confidence if is_programming else 0.0,
             },
         )
 
@@ -551,6 +613,7 @@ class IntentExtractor:
         result_type: ResultType | None = None,
         complexity: Complexity = Complexity.MODERATE,
         ethical_signals: list[EthicalSignal] | None = None,
+        programming_context: ProgrammingContext | None = None,
     ) -> UniversalIntent:
         """
         Create a UniversalIntent object with proper structure
@@ -582,6 +645,7 @@ class IntentExtractor:
             inferred=InferredIntent(
                 useCases=use_cases or [],
                 temporalIntent=temporal_intent,
+                programmingContext=programming_context,
                 resultType=result_type,
                 complexity=complexity,
                 ethicalSignals=ethical_signals or [],

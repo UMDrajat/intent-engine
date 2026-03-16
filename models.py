@@ -670,6 +670,8 @@ class ExtractedIntent(BaseModel):
     result_type: str
     complexity: str
     confidence: float
+    programming_context: dict[str, Any] | None = None
+    research_plan: dict[str, Any] | None = None
 
 
 class UnifiedSearchResponse(BaseModel):
