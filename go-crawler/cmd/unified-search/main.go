@@ -229,8 +229,8 @@ func main() {
 
 	// Setup routes
 	r := mux.NewRouter()
-	r.HandleFunc("/health", healthHandler).Methods("GET")
-	r.HandleFunc("/stats", statsHandler).Methods("GET")
+	r.HandleFunc("/health", healthHandler).Methods("GET", "HEAD")
+	r.HandleFunc("/stats", statsHandler).Methods("GET", "HEAD")
 	r.HandleFunc("/api/v1/search", createSearchHandler(vectorSearch)).Methods("POST")
 	r.HandleFunc("/api/v1/add-urls", addURLsHandler).Methods("POST")
 	r.Handle("/metrics", promhttp.Handler()).Methods("GET")

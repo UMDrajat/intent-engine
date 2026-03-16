@@ -97,8 +97,8 @@ func main() {
 
 	// Setup routes
 	r := mux.NewRouter()
-	r.HandleFunc("/health", healthHandler).Methods("GET")
-	r.HandleFunc("/stats", statsHandler).Methods("GET")
+	r.HandleFunc("/health", healthHandler).Methods("GET", "HEAD")
+	r.HandleFunc("/stats", statsHandler).Methods("GET", "HEAD")
 	r.HandleFunc("/api/v1/search", searchHandler).Methods("POST")
 	r.HandleFunc("/metrics", promhttp.Handler().ServeHTTP).Methods("GET")
 

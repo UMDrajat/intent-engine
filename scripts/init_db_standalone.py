@@ -342,6 +342,7 @@ tables["crawled_pages"] = Table(
     Column("load_time_ms", Float),
     Column("inbound_links", Integer, default=0),
     Column("outbound_links", Integer, default=0),
+    Column("pagerank", Float, default=0.0),
     Column("crawl_depth", Integer, default=0),
     Column("crawler_version", String(50)),
     Column("crawled_at", DateTime, default=func.now(), nullable=False),
@@ -365,6 +366,19 @@ tables["page_links"] = Table(
     Column("created_at", DateTime, default=func.now(), nullable=False),
     Index("ix_page_links_source", "source_page_id"),
     Index("ix_page_links_target", "target_url"),
+    Index("ix_page_links_source_target", "source_page_id", "target_url", unique=True),
+)
+
+tables["crawl_stats"] = Table(
+    "crawl_stats",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("stat_date", Date, nullable=False, unique=True),
+    Column("pages_crawled", Integer, default=0),
+    Column("pages_failed", Integer, default=0),
+    Column("pages_indexed", Integer, default=0),
+    Column("links_extracted", Integer, default=0),
+    Column("updated_at", DateTime, default=func.now(), onupdate=func.now()),
 )
 
 tables["search_index"] = Table(
