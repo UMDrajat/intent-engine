@@ -15,6 +15,7 @@ type SearchIndexer struct {
 	index          bleve.Index
 	store          *storage.Storage
 	intentAnalyzer *intent.IntentAnalyzer
+	readOnly       bool
 }
 
 // SearchDocument represents a document in the search index
@@ -46,15 +47,20 @@ type SearchHit struct {
 
 // NewSearchIndexer creates a new search indexer
 func NewSearchIndexer(blevePath string, store *storage.Storage) (*SearchIndexer, error) {
+	return NewSearchIndexerWithOptions(blevePath, store, false)
+}
+
+// NewSearchIndexerWithOptions creates a new search indexer with specific options
+func NewSearchIndexerWithOptions(blevePath string, store *storage.Storage, readOnly bool) (*SearchIndexer, error) {
 	// Create index mapping with intent fields
 	mapping := bleve.NewIndexMapping()
-	
+
 	// Add fields for intent-aware search
 	mapping.DefaultMapping.AddFieldMappingsAt("title", bleve.NewTextFieldMapping())
 	mapping.DefaultMapping.AddFieldMappingsAt("content", bleve.NewTextFieldMapping())
 	mapping.DefaultMapping.AddFieldMappingsAt("meta_description", bleve.NewTextFieldMapping())
 	mapping.DefaultMapping.AddFieldMappingsAt("url", bleve.NewTextFieldMapping())
-	
+
 	// Add intent-specific fields
 	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.primary_goal", bleve.NewTextFieldMapping())
 	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.topics", bleve.NewTextFieldMapping())
@@ -62,24 +68,39 @@ func NewSearchIndexer(blevePath string, store *storage.Storage) (*SearchIndexer,
 	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.complexity", bleve.NewTextFieldMapping())
 	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.result_type", bleve.NewTextFieldMapping())
 
-	// Open or create index
-	index, err := bleve.Open(blevePath)
-	if err == nil {
-		log.Printf("Opened existing Bleve index at %s", blevePath)
-	} else {
-		// Index doesn't exist or is incompatible, create new one
-		log.Printf("Creating new Bleve index at %s (error: %v)", blevePath, err)
-		index, err = bleve.New(blevePath, mapping)
+	var index bleve.Index
+	var err error
+
+	if readOnly {
+		// Open in read-only mode for shared access
+		// Note: We use regular Open but the index files are mounted read-only from the host
+		index, err = bleve.Open(blevePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Bleve index: %w", err)
+			log.Printf("Bleve open error details: %v", err)
+			return nil, fmt.Errorf("failed to open Bleve index in read-only mode: %w", err)
 		}
-		log.Printf("Created new Bleve index at %s", blevePath)
+		log.Printf("Opened existing Bleve index at %s in READ-ONLY mode (via mounted volume)", blevePath)
+	} else {
+		// Open or create index in read-write mode (uses Scorch backend by default)
+		index, err = bleve.Open(blevePath)
+		if err == nil {
+			log.Printf("Opened existing Bleve index at %s (Scorch backend)", blevePath)
+		} else {
+			// Index doesn't exist or is incompatible, create new one
+			log.Printf("Creating new Bleve index at %s (error: %v, using Scorch backend)", blevePath, err)
+			index, err = bleve.New(blevePath, mapping)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Bleve index: %w", err)
+			}
+			log.Printf("Created new Bleve index at %s (Scorch backend)", blevePath)
+		}
 	}
 
 	return &SearchIndexer{
 		index:          index,
 		store:          store,
 		intentAnalyzer: intent.NewIntentAnalyzer(),
+		readOnly:       readOnly,
 	}, nil
 }
 

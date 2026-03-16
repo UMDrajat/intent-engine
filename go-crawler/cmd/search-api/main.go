@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/blevesearch/bleve/v2"
 	"github.com/gorilla/mux"
 	"github.com/itxLikhith/intent-engine/go-crawler/internal/indexer"
 	"github.com/itxLikhith/intent-engine/go-crawler/internal/storage"
@@ -58,14 +59,15 @@ type StatsResponse struct {
 
 var (
 	searchIndexer *indexer.SearchIndexer
+	bleveIndex    bleve.Index  // Fallback bleve index if SearchIndexer fails to initialize
 	store         *storage.Storage
 )
 
 func main() {
-	port := flag.String("port", "8080", "Server port")
-	blevePath := flag.String("bleve", "./data/bleve", "Bleve index path")
-	badgerPath := flag.String("badger", "./data/badger", "BadgerDB path")
-	postgresDSN := flag.String("postgres", os.Getenv("POSTGRES_DSN"), "PostgreSQL DSN")
+	port := flag.String("port", getEnv("SERVER_PORT", "8080"), "Server port")
+	blevePath := flag.String("bleve", getEnv("BLEVE_PATH", "./data/bleve"), "Bleve index path")
+	badgerPath := flag.String("badger", getEnv("BADGER_PATH", "./data/badger"), "BadgerDB path")
+	postgresDSN := flag.String("postgres", getEnv("POSTGRES_DSN", ""), "PostgreSQL DSN")
 	flag.Parse()
 
 	if *postgresDSN == "" {
@@ -76,24 +78,56 @@ func main() {
 	log.Printf("Bleve Path: %s", *blevePath)
 	log.Printf("PostgreSQL: %s", *postgresDSN)
 
-	// Initialize storage
+	// Initialize storage (read-only for API)
 	storeCfg := &storage.StorageConfig{
 		PostgresDSN: *postgresDSN,
 		BadgerPath:  *badgerPath,
+		ReadOnly:    true,
 	}
 	var err error
+	log.Printf("Initializing storage with config: BadgerPath=%s, ReadOnly=%v", *badgerPath, true)
 	store, err = storage.NewStorage(storeCfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 	defer store.Close()
+	log.Printf("Storage initialized successfully")
 
 	// Initialize indexer
-	searchIndexer, err = indexer.NewSearchIndexer(*blevePath, store)
-	if err != nil {
-		log.Fatalf("Failed to initialize indexer: %v", err)
+	log.Printf("Initializing indexer with Bleve path: %s (read-only)", *blevePath)
+
+	// Check if index exists before trying to open
+	if _, err := os.Stat(*blevePath); os.IsNotExist(err) {
+		log.Printf("Warning: Bleve index does not exist at %s - search will return no results", *blevePath)
+		log.Printf("Index will be created when first document is indexed by go-indexer")
+		// Create empty index as fallback
+		mapping := bleve.NewIndexMapping()
+		mapping.DefaultMapping.AddFieldMappingsAt("title", bleve.NewTextFieldMapping())
+		mapping.DefaultMapping.AddFieldMappingsAt("content", bleve.NewTextFieldMapping())
+		mapping.DefaultMapping.AddFieldMappingsAt("meta_description", bleve.NewTextFieldMapping())
+		mapping.DefaultMapping.AddFieldMappingsAt("url", bleve.NewTextFieldMapping())
+		bleveIndex, err = bleve.New(*blevePath, mapping)
+		if err != nil {
+			log.Fatalf("Failed to create empty Bleve index: %v", err)
+		}
+		log.Printf("Created empty Bleve index (fallback mode)")
+	} else {
+		searchIndexer, err = indexer.NewSearchIndexerWithOptions(*blevePath, store, true)
+		if err != nil {
+			log.Fatalf("Failed to initialize indexer: %v", err)
+		}
+		log.Printf("Indexer initialized successfully")
 	}
-	defer searchIndexer.Close()
+
+	// Setup defer cleanup
+	defer func() {
+		if searchIndexer != nil {
+			searchIndexer.Close()
+		}
+		if bleveIndex != nil {
+			bleveIndex.Close()
+		}
+	}()
 
 	// Setup routes
 	r := mux.NewRouter()
@@ -110,7 +144,7 @@ func main() {
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	checks := map[string]bool{
-		"indexer": searchIndexer != nil,
+		"indexer": searchIndexer != nil || bleveIndex != nil,
 		"storage": store != nil,
 	}
 
@@ -136,11 +170,16 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 func statsHandler(w http.ResponseWriter, r *http.Request) {
 	stats := StatsResponse{}
 
-	// Get index stats
+	// Get index stats from SearchIndexer or fallback bleve index
 	if searchIndexer != nil {
 		indexStats, err := searchIndexer.Stats()
 		if err == nil {
 			stats.IndexedDocuments = indexStats.DocumentCount
+		}
+	} else if bleveIndex != nil {
+		docCount, err := bleveIndex.DocCount()
+		if err == nil {
+			stats.IndexedDocuments = docCount
 		}
 	}
 
@@ -170,8 +209,65 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		req.Limit = 100
 	}
 
-	// Perform search
-	searchResult, err := searchIndexer.Search(req.Query, req.Limit)
+	// Perform search using SearchIndexer or fallback bleve index
+	var searchResult *indexer.SearchResult
+	var err error
+
+	if searchIndexer != nil {
+		// Use full-featured SearchIndexer
+		searchResult, err = searchIndexer.Search(req.Query, req.Limit)
+	} else if bleveIndex != nil {
+		// Use basic bleve index (fallback mode)
+		query := bleve.NewMatchQuery(req.Query)
+		searchRequest := bleve.NewSearchRequest(query)
+		searchRequest.Size = req.Limit
+		bleveResult, bleveErr := bleveIndex.Search(searchRequest)
+		if bleveErr != nil {
+			log.Printf("Bleve search error: %v", bleveErr)
+			http.Error(w, "Search failed", http.StatusInternalServerError)
+			return
+		}
+		// Convert bleve result to our format
+		searchResult = &indexer.SearchResult{
+			Total:    int64(bleveResult.Total),
+			MaxScore: bleveResult.MaxScore,
+			Hits:     make([]indexer.SearchHit, len(bleveResult.Hits)),
+		}
+		for i, hit := range bleveResult.Hits {
+			doc := &indexer.SearchDocument{}
+			for field, value := range hit.Fields {
+				switch field {
+				case "url":
+					if s, ok := value.(string); ok {
+						doc.URL = s
+					}
+				case "title":
+					if s, ok := value.(string); ok {
+						doc.Title = s
+					}
+				case "content":
+					if s, ok := value.(string); ok {
+						doc.Content = s
+					}
+				case "meta_description":
+					if s, ok := value.(string); ok {
+						doc.MetaDescription = s
+					}
+				}
+			}
+			searchResult.Hits[i] = indexer.SearchHit{
+				ID:       hit.ID,
+				Score:    hit.Score,
+				Document: doc,
+			}
+		}
+		err = nil
+	} else {
+		log.Printf("No index available for search")
+		http.Error(w, "Search index not available", http.StatusInternalServerError)
+		return
+	}
+
 	if err != nil {
 		log.Printf("Search error: %v", err)
 		http.Error(w, "Search failed", http.StatusInternalServerError)
@@ -208,4 +304,11 @@ func truncateContent(content string, maxLen int) string {
 		return content
 	}
 	return content[:maxLen] + "..."
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }

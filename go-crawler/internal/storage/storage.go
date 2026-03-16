@@ -23,6 +23,7 @@ type Storage struct {
 type StorageConfig struct {
 	PostgresDSN string
 	BadgerPath  string
+	ReadOnly    bool
 }
 
 // NewStorage creates a new storage instance
@@ -45,18 +46,31 @@ func NewStorage(config *StorageConfig) (*Storage, error) {
 
 	log.Println("Connected to PostgreSQL")
 
-	// Open BadgerDB
-	badger, err := badger.Open(badger.DefaultOptions(config.BadgerPath))
-	if err != nil {
-		postgres.Close()
-		return nil, fmt.Errorf("failed to open BadgerDB: %w", err)
+	// Open BadgerDB (always enabled for optimal performance)
+	opts := badger.DefaultOptions(config.BadgerPath)
+	if config.ReadOnly {
+		opts.ReadOnly = true
+		opts.BypassLockGuard = true
+		opts.Logger = nil // Reduce noise in read-only mode
 	}
 
-	log.Println("Opened BadgerDB")
+	badgerDB, err := badger.Open(opts)
+	if err != nil {
+		if config.ReadOnly {
+			// In read-only mode, BadgerDB might not exist yet - this is okay
+			log.Printf("Warning: BadgerDB not available in read-only mode: %v", err)
+			log.Println("Continuing without BadgerDB (HTML content will not be available)")
+		} else {
+			postgres.Close()
+			return nil, fmt.Errorf("failed to open BadgerDB: %w", err)
+		}
+	} else {
+		log.Println("Opened BadgerDB")
+	}
 
 	return &Storage{
 		postgres: postgres,
-		badger:   badger,
+		badger:   badgerDB,
 	}, nil
 }
 
@@ -114,7 +128,7 @@ func (s *Storage) SavePage(page *models.CrawledPage) error {
 	page.ID = fmt.Sprintf("page_%d", pageID)
 
 	// Store raw HTML in BadgerDB (if available)
-	if page.HTMLContent != "" {
+	if page.HTMLContent != "" && s.badger != nil {
 		err = s.badger.Update(func(txn *badger.Txn) error {
 			key := []byte("html:" + page.ID)
 			return txn.Set(key, []byte(page.HTMLContent))
@@ -204,16 +218,19 @@ func (s *Storage) GetPage(id string) (*models.CrawledPage, error) {
 	`
 
 	page = &models.CrawledPage{}
+	var pageRank sql.NullFloat64
 	err = s.postgres.QueryRow(query, id).Scan(
 		&page.ID, &page.URL, &page.FinalURL, &page.Title, &page.Content,
 		&page.MetaDescription, &page.MetaKeywords, &page.StatusCode,
 		&page.ContentType, &page.ContentLength, &page.LoadTimeMs,
-		&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &page.PageRank,
+		&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &pageRank,
 		&page.Language, &page.IsIndexed, &page.CrawledAt, &page.UpdatedAt, &page.NextCrawlAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query page: %w", err)
 	}
+
+	page.PageRank = pageRank.Float64
 
 	// Convert integer ID to string format
 	page.ID = fmt.Sprintf("page_%d", page.ID)
@@ -233,16 +250,19 @@ func (s *Storage) GetPageByIntID(intID string) (*models.CrawledPage, error) {
 	`
 
 	page := &models.CrawledPage{}
+	var pageRank sql.NullFloat64
 	err := s.postgres.QueryRow(query, intID).Scan(
 		&page.ID, &page.URL, &page.FinalURL, &page.Title, &page.Content,
 		&page.MetaDescription, &page.MetaKeywords, &page.StatusCode,
 		&page.ContentType, &page.ContentLength, &page.LoadTimeMs,
-		&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &page.PageRank,
+		&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &pageRank,
 		&page.Language, &page.IsIndexed, &page.CrawledAt, &page.UpdatedAt, &page.NextCrawlAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query page: %w", err)
 	}
+
+	page.PageRank = pageRank.Float64
 
 	// Convert integer ID to string format
 	page.ID = fmt.Sprintf("page_%d", page.ID)
@@ -302,8 +322,10 @@ func (s *Storage) GetStats() (*models.CrawlStats, error) {
 func (s *Storage) Close() error {
 	var errs []error
 
-	if err := s.badger.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("failed to close BadgerDB: %w", err))
+	if s.badger != nil {
+		if err := s.badger.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close BadgerDB: %w", err))
+		}
 	}
 
 	if err := s.postgres.Close(); err != nil {
@@ -355,16 +377,18 @@ func (s *Storage) GetUnindexedPages(limit int) ([]*models.CrawledPage, error) {
 	var pages []*models.CrawledPage
 	for rows.Next() {
 		page := &models.CrawledPage{}
+		var pageRank sql.NullFloat64
 		err := rows.Scan(
 			&page.ID, &page.URL, &page.FinalURL, &page.Title, &page.Content,
 			&page.MetaDescription, &page.MetaKeywords, &page.StatusCode,
 			&page.ContentType, &page.ContentLength, &page.LoadTimeMs,
-			&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &page.PageRank,
+			&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &pageRank,
 			&page.Language, &page.IsIndexed, &page.CrawledAt, &page.UpdatedAt, &page.NextCrawlAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan page: %w", err)
 		}
+		page.PageRank = pageRank.Float64
 		pages = append(pages, page)
 	}
 

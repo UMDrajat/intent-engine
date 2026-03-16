@@ -26,7 +26,7 @@ services:
       - BADGER_PATH=/data/badger
       - REDIS_ADDR=redis:6379
     volumes:
-      - go-api-data:/data
+      - go-search-data:/data  # Separate index for search API (avoids file locking)
     networks:
       - intent-network
     restart: unless-stopped
@@ -35,6 +35,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    depends_on:
+      - go-indexer
     deploy:
       resources:
         limits:
@@ -94,6 +96,29 @@ services:
       -batch-size=50
       -interval=60
 
+  # ===========================================================================
+  # Index Sync Service
+  # ===========================================================================
+  # Periodically syncs index from go-indexer to go-search-api
+  # This avoids file locking issues by giving each service its own index copy
+  go-index-sync:
+    build:
+      context: ./go-crawler
+      dockerfile: deployments/Dockerfile.index-sync
+    container_name: intent-go-index-sync
+    environment:
+      - INDEXER_BLEVE_PATH=/data/indexer/bleve
+      - SEARCH_BLEVE_PATH=/data/search/bleve
+      - SYNC_INTERVAL=60
+    volumes:
+      - go-indexer-data:/data/indexer
+      - go-search-data:/data/search
+    networks:
+      - intent-network
+    restart: unless-stopped
+    depends_on:
+      - go-indexer
+
 networks:
   intent-network:
     external: true
@@ -103,6 +128,6 @@ networks:
     name: intent-engine_searxng
 
 volumes:
-  go-api-data:
   go-crawler-data:
   go-indexer-data:
+  go-search-data:

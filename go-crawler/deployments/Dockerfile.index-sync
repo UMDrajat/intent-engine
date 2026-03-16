@@ -1,0 +1,25 @@
+# Intent Engine - Index Sync Service
+# Syncs Bleve index from indexer to search API periodically
+
+FROM alpine:latest
+
+RUN apk --no-cache add rsync bash
+
+WORKDIR /sync
+
+# Copy sync script
+COPY scripts/sync-index.sh .
+RUN chmod +x sync-index.sh
+
+# Create data directories
+RUN mkdir -p /data/indexer /data/bleve
+
+# Mount points:
+# - /data/indexer/bleve (from go-indexer-data volume)
+# - /data/bleve (from go-search-data volume)
+
+ENV INDEXER_BLEVE_PATH=/data/indexer/bleve
+ENV SEARCH_BLEVE_PATH=/data/bleve
+ENV SYNC_INTERVAL=60
+
+CMD ["./sync-index.sh"]

@@ -53,9 +53,11 @@ postgres:
   dsn: "postgresql://user:pass@localhost:5432/intent_engine"
 
 # Storage Configuration
+# BadgerDB is used for raw HTML storage (offloads large BLOBs from PostgreSQL)
+# Bleve uses Scorch backend by default for search indexing
 storage:
-  badger_path: "./data/badger"
-  bleve_path: "./data/bleve"
+  badger_path: "./data/badger"    # Raw HTML storage (BadgerDB)
+  bleve_path: "./data/bleve"      # Search index (Scorch backend)
 
 # API Server Configuration
 server:

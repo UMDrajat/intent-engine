@@ -15,12 +15,12 @@ import (
 
 func main() {
 	// Command line flags
-	redisAddr := flag.String("redis", "localhost:6379", "Redis address")
-	postgresDSN := flag.String("postgres", "postgresql://crawler:crawler@localhost:5432/intent_engine?sslmode=disable", "PostgreSQL DSN")
-	blevePath := flag.String("bleve", "./data/bleve", "Bleve index path")
-	badgerPath := flag.String("badger", "./data/badger", "BadgerDB path")
+	redisAddr := flag.String("redis", getEnv("REDIS_ADDR", "localhost:6379"), "Redis address")
+	postgresDSN := flag.String("postgres", getEnv("POSTGRES_DSN", "postgresql://crawler:crawler@localhost:5432/intent_engine?sslmode=disable"), "PostgreSQL DSN")
+	blevePath := flag.String("bleve", getEnv("BLEVE_PATH", "./data/bleve"), "Bleve index path")
+	badgerPath := flag.String("badger", getEnv("BADGER_PATH", "./data/badger"), "BadgerDB path")
 	batchSize := flag.Int("batch-size", 100, "Number of documents to index at once")
-	interval := flag.Int("interval", 10, "Indexing interval in seconds")
+	interval := flag.Int("interval", 60, "Indexing interval in seconds")
 	flag.Parse()
 
 	log.Printf("Starting Intent Engine Indexer...")
@@ -87,4 +87,11 @@ func main() {
 			}
 		}
 	}
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }

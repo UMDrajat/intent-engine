@@ -122,8 +122,8 @@ class SearXNGClient:
         """
         # Use environment variable or Docker service name by default for containerized deployments
         self.base_url = (base_url or os.getenv("SEARXNG_BASE_URL", "http://searxng:8080")).rstrip("/")
-        self.timeout = 5.0  # Reduced from 10s for better responsiveness
-        self.connect_timeout = 2.0  # Reduced from 3.0s
+        self.timeout = 15.0  # Increased from 5.0s to handle slow engines
+        self.connect_timeout = 5.0  # Increased from 2.0s
         self.cache_ttl = 600  # Cache TTL: 10 minutes
 
         # Initialize Redis cache if available
@@ -295,7 +295,7 @@ class SearXNGClient:
         except (httpx.RequestError, httpx.HTTPStatusError) as e:
             # Record failure in circuit breaker
             self.circuit_breaker.record_failure()
-            logger.error(f"SearXNG request failed: {e}")
+            logger.error(f"SearXNG request failed ({type(e).__name__}): {e}")
 
             # Return empty response instead of raising to keep system running
             return SearXNGResponse(
@@ -309,7 +309,7 @@ class SearXNGClient:
                 engines=[],
             )
         except Exception as e:
-            logger.error(f"Error parsing SearXNG response: {e}")
+            logger.error(f"Error parsing SearXNG response ({type(e).__name__}): {e}")
             return SearXNGResponse(
                 query=query,
                 results=[],

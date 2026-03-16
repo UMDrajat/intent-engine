@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -181,11 +182,13 @@ func main() {
 	log.Printf("Parallel Search: %v", parallelSearch)
 	log.Printf("Qdrant Address: %s", qdrantAddr)
 
-	// Initialize storage
+	// Initialize storage (read-only for API)
 	storeCfg := &storage.StorageConfig{
 		PostgresDSN: postgresDSN,
 		BadgerPath:  badgerPath,
+		ReadOnly:    true,
 	}
+
 	var err error
 	store, err = storage.NewStorage(storeCfg)
 	if err != nil {
@@ -194,7 +197,7 @@ func main() {
 	defer store.Close()
 
 	// Initialize indexer
-	searchIndexer, err = indexer.NewSearchIndexer(blevePath, store)
+	searchIndexer, err = indexer.NewSearchIndexerWithOptions(blevePath, store, true)
 	if err != nil {
 		log.Fatalf("Failed to initialize indexer: %v", err)
 	}
@@ -587,9 +590,14 @@ func searchSearxng(query string, limit int, queryIntent *intent.DeclaredIntent) 
 	urlsToAdd := make([]string, 0)
 	startTime := time.Now()
 
-	searchURL := fmt.Sprintf("%s/search?q=%s&format=json&language=en&categories=general&pageno=1",
-		searxngURL,
-		query)
+	params := url.Values{}
+	params.Add("q", query)
+	params.Add("format", "json")
+	params.Add("language", "en")
+	params.Add("categories", "general")
+	params.Add("pageno", "1")
+
+	searchURL := fmt.Sprintf("%s/search?%s", searxngURL, params.Encode())
 
 	resp, err := http.Get(searchURL)
 	if err != nil {
