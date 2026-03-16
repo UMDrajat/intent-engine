@@ -168,9 +168,19 @@ jobs:
 
           echo "Bumping version: $CURRENT_VERSION with $BUMP_TYPE increment"
 
+          # Check if expected new version tag already exists on remote
+          # We do this to determine if we should "force" or if it's already released
+          # But for now, let's just run cz bump
+          
           # Run commitizen bump
-          cz bump --increment $BUMP_TYPE --yes --changelog-to-stdout > /tmp/changelog_entry.txt || {
+          # Note: cz bump will update pyproject.toml and create a commit/tag
+          if cz bump --increment $BUMP_TYPE --yes --changelog-to-stdout > /tmp/changelog_entry.txt; then
+            echo "Commitizen bump successful"
+            MANUAL_BUMP=false
+          else
             echo "Commitizen bump failed, trying manual update"
+            MANUAL_BUMP=true
+            
             # Fallback: manually update version
             MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
             MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
@@ -191,54 +201,55 @@ jobs:
             sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" pyproject.toml
             sed -i "s/__version__ = \".*\"/__version__ = \"$NEW_VERSION\"/" __version__.py
             echo "Manually bumped to $NEW_VERSION"
-            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          }
-
-          # Get new version from pyproject.toml if commitizen succeeded
-          if [ -z "${{ steps.bump.outputs.new_version }}" ]; then
-            NEW_VERSION=$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)
-            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           fi
-          
-          NEW_VERSION=$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)
-          echo "Version bumped to: $NEW_VERSION"
 
-          # Check if tag already exists
+          # Get new version from pyproject.toml
+          NEW_VERSION=$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)
+          echo "Version is now: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if tag exists (either from previous runs or created by cz bump)
           if git rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
-            echo "⚠️ Tag v$NEW_VERSION already exists!"
-            echo "This version was already released. Skipping tag creation."
-            echo "tag_exists=true" >> $GITHUB_OUTPUT
+            echo "tag_exists_locally=true" >> $GITHUB_OUTPUT
           else
-            echo "tag_exists=false" >> $GITHUB_OUTPUT
+            echo "tag_exists_locally=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Push version changes
-        if: steps.bump.outputs.new_version != '' && steps.bump.outputs.tag_exists != 'true'
+        if: steps.bump.outputs.new_version != ''
         run: |
-          git add -A
-          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]" || echo "No changes to commit"
-
-          # Check if tag already exists (double-check)
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
-          if git rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
-            echo "⚠️ Tag v$NEW_VERSION already exists!"
-            echo "Removing existing tag and recreating..."
-            git tag -d "v$NEW_VERSION" || true
-            git push origin :refs/tags/v$NEW_VERSION || true
+          
+          # Ensure all changes are staged
+          git add -A
+          
+          # Only commit if there are changes (manual bump or cz bump without commit)
+          if ! git diff --cached --exit-code > /tmp/git_diff_exit_code; then
+            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          else
+            echo "No changes to commit (already committed by commitizen)"
           fi
 
-          git push origin HEAD:$(git rev-parse --abbrev-ref HEAD)
-          git push --tags
-          echo "✓ Pushed version v$NEW_VERSION"
-
-      - name: Skip push (tag already exists)
-        if: steps.bump.outputs.new_version != '' && steps.bump.outputs.tag_exists == 'true'
-        run: |
-          echo "⚠️ Version v${{ steps.bump.outputs.new_version }} already tagged, skipping push"
-          echo "This is expected if the workflow ran multiple times for the same commits"
+          # Handle tag: if it exists, delete and recreate to be safe, 
+          # or if it doesn't exist (manual bump), create it
+          if git rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
+            echo "⚠️ Tag v$NEW_VERSION already exists locally, recreating..."
+            git tag -d "v$NEW_VERSION"
+          fi
+          
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          
+          # Push changes to master/main
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          git push origin HEAD:$CURRENT_BRANCH --force-with-lease
+          
+          # Push tag (force to overwrite remote tag if it exists)
+          git push origin "v$NEW_VERSION" --force
+          
+          echo "✓ Pushed version v$NEW_VERSION and tag"
 
       - name: Create GitHub Release
-        if: steps.bump.outputs.new_version != '' && steps.bump.outputs.tag_exists != 'true'
+        if: steps.bump.outputs.new_version != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.bump.outputs.new_version }}
@@ -246,7 +257,7 @@ jobs:
           body_path: /tmp/changelog_entry.txt
           draft: false
           prerelease: ${{ contains(steps.bump.outputs.new_version, 'alpha') || contains(steps.bump.outputs.new_version, 'beta') || contains(steps.bump.outputs.new_version, 'rc') }}
-          generate_release_notes: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
@@ -258,4 +269,5 @@ jobs:
           echo "- Last tag: ${{ steps.last_tag.outputs.last_tag }}"
           echo "- Bump type: ${{ steps.commits.outputs.bump_type }}"
           echo "- New version: v${{ steps.bump.outputs.new_version }}"
-          echo "- Tag exists: ${{ steps.bump.outputs.tag_exists }}"
+          echo "- Success: ${{ steps.bump.outputs.new_version != '' }}"
+
