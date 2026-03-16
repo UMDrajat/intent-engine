@@ -461,6 +461,7 @@ class URLAnalyzer:
 _ranking_executor = None
 _executor_lock = asyncio.Lock()
 
+
 async def get_ranking_executor():
     """Get or create the process pool executor for ranking"""
     global _ranking_executor
@@ -469,9 +470,11 @@ async def get_ranking_executor():
             if _ranking_executor is None:
                 # Use a small number of workers for CPU-bound tasks
                 import os
+
                 num_workers = min(os.cpu_count() or 4, 8)
                 _ranking_executor = ProcessPoolExecutor(max_workers=num_workers)
     return _ranking_executor
+
 
 def analyze_url_task(url: str) -> URLAnalysisResult:
     """
@@ -479,6 +482,7 @@ def analyze_url_task(url: str) -> URLAnalysisResult:
     """
     analyzer = URLAnalyzer()
     return analyzer.analyze_url(url)
+
 
 class URLRanker:
     """
@@ -569,27 +573,29 @@ class URLRanker:
         """Analyze URLs in parallel using ProcessPoolExecutor for CPU-bound tasks"""
         executor = await get_ranking_executor()
         loop = asyncio.get_running_loop()
-        
+
         # Run all URL analyses concurrently in the process pool
         tasks = [loop.run_in_executor(executor, analyze_url_task, url) for url in urls]
         analysis_results = await asyncio.gather(*tasks)
 
         results = []
         for analysis in analysis_results:
-            results.append(URLResult(
-                url=analysis.url,
-                title=analysis.title,
-                description=analysis.description,
-                domain=analysis.domain,
-                privacy_score=analysis.privacy_score,
-                tracker_count=analysis.quality_indicators.get("tracker_count", 0),
-                encryption_enabled=analysis.quality_indicators.get("encryption", True),
-                content_type=analysis.content_type,
-                is_open_source=analysis.quality_indicators.get("is_open_source", False),
-                is_non_profit=analysis.quality_indicators.get("is_non_profit", False),
-                quality_score=0.5,
-                authority_score=self._calculate_authority(analysis.domain),
-            ))
+            results.append(
+                URLResult(
+                    url=analysis.url,
+                    title=analysis.title,
+                    description=analysis.description,
+                    domain=analysis.domain,
+                    privacy_score=analysis.privacy_score,
+                    tracker_count=analysis.quality_indicators.get("tracker_count", 0),
+                    encryption_enabled=analysis.quality_indicators.get("encryption", True),
+                    content_type=analysis.content_type,
+                    is_open_source=analysis.quality_indicators.get("is_open_source", False),
+                    is_non_profit=analysis.quality_indicators.get("is_non_profit", False),
+                    quality_score=0.5,
+                    authority_score=self._calculate_authority(analysis.domain),
+                )
+            )
 
         return results
 

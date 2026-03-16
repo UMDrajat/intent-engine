@@ -9,12 +9,12 @@ import hashlib
 import json
 import logging
 import os
+import time
 from dataclasses import asdict, dataclass
+from enum import Enum
 from typing import Any
 
 import httpx
-import time
-from enum import Enum
 
 try:
     import redis
@@ -25,15 +25,18 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 class CircuitState(Enum):
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
 
+
 class CircuitBreaker:
     """
     Circuit breaker for external service calls.
     """
+
     def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 30.0):
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
@@ -55,15 +58,16 @@ class CircuitBreaker:
     def can_execute(self) -> bool:
         if self.state == CircuitState.CLOSED:
             return True
-        
+
         if self.state == CircuitState.OPEN:
             if time.time() - self.last_failure_time > self.recovery_timeout:
                 self.state = CircuitState.HALF_OPEN
                 logger.info("Circuit breaker entering half-open state")
                 return True
             return False
-        
-        return True # HALF_OPEN
+
+        return True  # HALF_OPEN
+
 
 @dataclass
 class SearXNGResult:
@@ -147,7 +151,7 @@ class SearXNGClient:
             limits=limits,
             http2=True,  # Enable HTTP/2 for better performance
         )
-        
+
         # Initialize circuit breaker
         self.circuit_breaker = CircuitBreaker()
 
@@ -292,7 +296,7 @@ class SearXNGClient:
             # Record failure in circuit breaker
             self.circuit_breaker.record_failure()
             logger.error(f"SearXNG request failed: {e}")
-            
+
             # Return empty response instead of raising to keep system running
             return SearXNGResponse(
                 query=query,

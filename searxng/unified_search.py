@@ -138,8 +138,8 @@ class UnifiedSearchService:
                     logger.info(
                         f"Intent extracted: goal={extracted_intent.goal}, use_cases={extracted_intent.use_cases}"
                     )
-                    
-                    # If intent suggests a different route than default, we could trigger 
+
+                    # If intent suggests a different route than default, we could trigger
                     # supplemental searches here if needed. For now, we use default + intent-based ranking.
             except Exception as e:
                 logger.warning(f"Intent extraction failed: {e}")
@@ -320,17 +320,18 @@ class UnifiedSearchService:
             try:
                 engine = get_developer_assistance_engine()
                 assistance = engine.generate_assistance_response(universal_intent)
-                
+
                 # Get optimized queries from programming extractor if possible
                 from extraction.programming_error_detector import get_programming_intent_extractor
+
                 prog_extractor = get_programming_intent_extractor()
                 optimized_queries = prog_extractor.generate_optimized_queries(ctx)
-                
+
                 if assistance.research_plan:
                     rp = assistance.research_plan
                     # Merge optimized queries
                     final_queries = list(set(optimized_queries + rp.optimized_search_queries))
-                    
+
                     research_plan_dict = {
                         "investigation_steps": rp.investigation_steps,
                         "optimized_search_queries": final_queries[:5],

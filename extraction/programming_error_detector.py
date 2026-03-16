@@ -805,7 +805,7 @@ class ProgrammingIntentExtractor:
         """
         queries = []
         lang = context.language.value if hasattr(context.language, "value") else str(context.language)
-        
+
         if lang == "unknown":
             lang = ""
 
@@ -831,7 +831,7 @@ class ProgrammingIntentExtractor:
         for q in queries:
             if q and q not in unique_queries:
                 unique_queries.append(q)
-        
+
         return unique_queries[:3]
 
 

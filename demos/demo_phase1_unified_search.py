@@ -81,10 +81,7 @@ async def test_query_router():
     from searxng.query_router import get_query_router
 
     # Configure router for local testing
-    router = get_query_router({
-        "go_crawler_url": "http://localhost:8081",
-        "searxng_url": "http://localhost:8080"
-    })
+    router = get_query_router({"go_crawler_url": "http://localhost:8081", "searxng_url": "http://localhost:8080"})
 
     # Test Case 1: Troubleshooting Query
     print_section("Test 1.1: Troubleshooting Query")
@@ -230,14 +227,11 @@ async def test_unified_search_service():
 
     try:
         from models import UnifiedSearchRequest
-        from searxng.unified_search import get_unified_search_service
         from searxng.query_router import get_query_router
+        from searxng.unified_search import get_unified_search_service
 
         # Configure router for local testing
-        get_query_router({
-            "go_crawler_url": "http://localhost:8081",
-            "searxng_url": "http://localhost:8080"
-        })
+        get_query_router({"go_crawler_url": "http://localhost:8081", "searxng_url": "http://localhost:8080"})
 
         service = get_unified_search_service()
 
