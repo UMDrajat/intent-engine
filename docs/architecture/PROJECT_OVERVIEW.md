@@ -1,9 +1,10 @@
 # Intent Engine - Project Overview
 
-**Version:** 0.3.0
-**Last Updated:** March 15, 2026
+**Version:** v2.1.1 - Self-Improving Search Loop
+**Last Updated:** March 16, 2026
 **Repository:** [intent-engine](https://github.com/itxLikhith/intent-engine)
 **Docker Image:** `anony45/intent-engine-api:latest`
+**License:** [IECL v1.0](../../LICENSE)
 
 ---
 
@@ -18,19 +19,20 @@ The Intent Engine is a **privacy-first, intent-driven system** for search, servi
 3. **Open Architecture**: Intent schema is composable and extensible
 4. **Non-Discriminatory**: Matching algorithms never use sensitive attributes
 5. **Transparent**: Intent extraction rules are inspectable and rule-based
+6. **Self-Improving**: Every search makes the system smarter via automatic URL seeding
 
-### Key Features
+### Key Features (v2.1)
 
 - ✅ **Intent Extraction** - Converts free-form queries to structured intent (NLP + rule-based)
 - ✅ **Privacy-Focused Search** - SearXNG integration with intent-aware ranking
-- ✅ **Federated Search** - Query router with Go Crawler + SearXNG backends
+- ✅ **Federated Search** - Query router with Go Crawler + SearXNG + Vector backends
 - ✅ **Result Aggregation** - Deduplication and score normalization across backends
 - ✅ **URL Ranking** - Privacy-compliant URL scoring and ranking
 - ✅ **Advanced Constraint Handling** - Supports range (`0-500`), comparison (`<=500`), min/max formats
 - ✅ **Web Intent Extraction** - Automatic intent tagging for crawled web content
-- ✅ **Vector Search** - Qdrant integration for semantic search (optional)
-- ✅ **Event Streaming** - Kafka/Redpanda integration for real-time analytics (optional)
-- ✅ **Distributed Tracing** - OpenTelemetry + Jaeger for observability (optional)
+- ✅ **Vector Search** - Qdrant integration for semantic search
+- ✅ **Redis Caching** - 11x faster search with 1h TTL caching
+- ✅ **Self-Improving Loop** - Search results automatically seed crawler queue
 - ✅ **Service Recommendation** - Routes users to appropriate services based on intent
 - ✅ **Ethical Ad Matching** - Fair ad matching with fairness validation
 - ✅ **Campaign Management** - Full advertising campaign lifecycle with budget tracking
@@ -38,6 +40,7 @@ The Intent Engine is a **privacy-first, intent-driven system** for search, servi
 - ✅ **Fraud Detection** - Comprehensive fraud detection for clicks, impressions, conversions
 - ✅ **A/B Testing** - Experiment management with statistical significance
 - ✅ **Privacy Compliance** - GDPR-ready with consent management and audit trails
+- ✅ **Seed Discovery** - Automatic topic discovery and expansion
 
 ---
 

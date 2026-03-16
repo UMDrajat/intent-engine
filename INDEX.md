@@ -2,22 +2,32 @@
 
 > **Organized Documentation Structure** - Find what you need quickly
 
-**Last Updated:** March 15, 2026 | **Version:** v2.0.0 - Self-Improving Search Loop
+**Last Updated:** March 16, 2026 | **Version:** v2.1.1 - Self-Improving Search Loop
 
 ---
 
-## 🎯 What's New in v2.0
+## 🎯 What's New in v2.1
 
-### Self-Improving Search Loop
+### Self-Improving Search Loop (v2.0+)
 - **Every search makes the system smarter!**
 - +634,000 URLs added from just 3 searches
 - Redis caching (11x faster)
 - Prometheus + Grafana monitoring
 - Qdrant vector search integration
+- Automatic URL seeding from search results
 
-**New Documentation:**
-- [Integration Guide](docs/INTEGRATION_GUIDE.md) - Complete v2.0 integration guide
-- [Self-Improving Loop](docs/architecture/SELF_IMPROVING_LOOP.md) - Architecture deep dive
+### Enhanced Features (v2.1)
+- Comprehensive fraud detection for clicks, impressions, and conversions
+- Real-time analytics with WebSocket broadcasting
+- Enhanced privacy controls with GDPR compliance
+- Advanced A/B testing with statistical significance
+- Complete campaign management lifecycle
+- Seed discovery and topic expansion
+
+**Key Documentation:**
+- [Self-Improving Loop Architecture](docs/architecture/SELF_IMPROVING_LOOP.md) - Complete architecture guide
+- [API Endpoints](README.md#api-endpoints) - Full API reference
+- [Deployment Checklist](docs/deployment/DEPLOYMENT_CHECKLIST.md) - Production deployment
 
 ---
 
@@ -27,23 +37,22 @@
 docs/
 ├── README.md                  # Documentation overview
 ├── ORGANIZATION.md            # File organization guide
-├── INTEGRATION_GUIDE.md       # v2.0 Integration Guide
+├── INTEGRATION_GUIDE.md       # Integration guide
 │
-├── getting-started/           # Quick start guides
-├── deployment/                # Production deployment
-├── architecture/              # System design
-├── go-crawler/                # Go crawler docs
-├── reference/                 # Technical reference
-└── testing/                   # Testing guides
+├── getting-started/           # Quick start guides (5 files)
+├── deployment/                # Production deployment (6 files)
+├── architecture/              # System design (4 files)
+├── go-crawler/                # Go crawler docs (13 files)
+├── reference/                 # Technical reference (9 files)
+└── testing/                   # Testing guides (3 files)
 ```
 
 **Root Files (Essential Only):**
 - `README.md` - Main project README
-- `INDEX.md` - Documentation index
-- `CHANGELOG_v2.md` - Current version changelog
-- `V2_SUMMARY.md` - v2.0 release summary
+- `INDEX.md` - Documentation index (this file)
 - `CONTRIBUTING.md` - Contribution guidelines
-- `LICENSE` - License file
+- `LICENSE` - Intent Engine Community License v1.0
+- `ARCHITECTURE_BLUEPRINT.md` - Unified architecture proposal
 
 **Note:** Historical docs moved to `docs/` subfolders. See `docs/ORGANIZATION.md` for details.
 

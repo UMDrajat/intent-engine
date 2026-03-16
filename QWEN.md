@@ -4,9 +4,10 @@
 
 The **Intent Engine** is a privacy-first, intent-driven system for search, service recommendation, and ad matching. It processes user queries to extract structured intent while respecting privacy and ethical considerations, without discriminatory targeting or user tracking.
 
-**Version:** 2.0.0 (Self-Improving Search Loop)  
+**Version:** 2.1.1 (Self-Improving Search Loop)  
 **Repository:** https://github.com/itxLikhith/intent-engine  
-**Docker Image:** `anony45/intent-engine-api:latest`
+**Docker Image:** `anony45/intent-engine-api:latest`  
+**License:** Intent Engine Community License (IECL) v1.0
 
 ### Core Principles
 
@@ -15,18 +16,20 @@ The **Intent Engine** is a privacy-first, intent-driven system for search, servi
 3. **Open Architecture**: Intent schema is composable and extensible
 4. **Non-Discriminatory**: Matching algorithms never use sensitive attributes
 5. **Transparent**: Intent extraction rules are inspectable and rule-based
+6. **Self-Improving**: Every search makes the system smarter via automatic URL seeding
 
-### Key Features
+### Key Features (v2.1)
 
 - **Intent Extraction** - Converts free-form queries to structured intent (NLP + rule-based)
 - **Privacy-Focused Search** - SearXNG integration with intent-aware ranking
-- **Federated Search** - Query router with Go Crawler + SearXNG backends
+- **Federated Search** - Query router with Go Crawler + SearXNG + Vector backends
 - **Result Aggregation** - Deduplication and score normalization across backends
 - **URL Ranking** - Privacy-compliant URL scoring and ranking
 - **Advanced Constraint Handling** - Supports range (`0-500`), comparison (`<=500`), min/max formats
 - **Web Intent Extraction** - Automatic intent tagging for crawled web content
-- **Vector Search** - Qdrant integration for semantic search (optional)
+- **Vector Search** - Qdrant integration for semantic search
 - **Redis Caching** - 11x faster search with 1h TTL caching
+- **Self-Improving Loop** - Search results → Crawl queue → Indexed content
 - **Service Recommendation** - Routes users to appropriate services based on intent
 - **Ethical Ad Matching** - Fair ad matching with fairness validation
 - **Campaign Management** - Full advertising campaign lifecycle with budget tracking
@@ -34,6 +37,7 @@ The **Intent Engine** is a privacy-first, intent-driven system for search, servi
 - **Fraud Detection** - Comprehensive fraud detection for clicks, impressions, conversions
 - **A/B Testing** - Experiment management with statistical significance
 - **Privacy Compliance** - GDPR-ready with consent management and audit trails
+- **Seed Discovery** - Automatic topic discovery and expansion
 
 ## Technology Stack
 
@@ -70,61 +74,77 @@ The **Intent Engine** is a privacy-first, intent-driven system for search, servi
 
 ```
 intent-engine/
-├── .github/                # GitHub Actions workflows (CI/CD, auto-version)
-├── abtesting/              # A/B testing module
-├── ads/                    # Ad matching module
-├── analytics/              # Real-time analytics + Kafka events
-├── audit/                  # Audit trail logging
-├── bin/                    # Executable scripts
-├── config/                 # Configuration modules + tracing
-├── core/                   # Shared schema and utilities
-│   ├── schema.py           # UniversalIntent class + enums
-│   ├── embedding_service.py # Shared embedding service
-│   ├── exceptions.py       # Custom exceptions
-│   ├── utils.py            # Shared helpers
-│   └── vector_store.py     # Qdrant vector DB integration
-├── extraction/             # Intent extraction
-│   ├── extractor.py        # Main extraction logic
-│   ├── constraints.py      # Constraint parsing
-│   └── web_extractor.py    # Web content intent extraction
-├── fraud/                  # Fraud detection
-├── go-crawler/             # Go-based web crawler
-├── privacy/                # Privacy compliance
-│   ├── consent_manager.py  # Consent management
-│   └── enhanced_privacy.py # Privacy controls
-├── ranking/                # Ranking module
-│   ├── ranker.py           # Main ranking logic
-│   ├── url_ranker.py       # URL ranking
-│   ├── optimized_ranker.py # Optimized ranking
-│   └── optimized_url_ranker.py # Optimized URL ranking
-├── searxng/                # SearXNG integration
-│   ├── client.py           # SearXNG client
-│   ├── query_router.py     # Intent-based query routing
-│   ├── result_aggregator.py # Result deduplication
-│   ├── topic_expander.py   # Topic discovery
-│   └── unified_search.py   # Unified search service
-├── services/               # Service recommendation
-├── scripts/                # Utility scripts
-├── tests/                  # Unit + integration tests
-├── perf_tests/             # Performance tests
-├── load_testing/           # Locust load tests
-├── migrations/             # Database migrations
-├── docs/                   # Documentation
-├── demos/                  # Demo scripts
-├── grafana/                # Grafana dashboards
-├── main.py                 # CLI entry point
-├── main_api.py             # FastAPI server (2700+ lines)
-├── worker.py               # ARQ worker
-├── database.py             # Database models
-├── models.py               # Pydantic models
-├── go_search_client.py     # Go crawler API client
-├── docker-compose.yml      # Docker orchestration
-├── Dockerfile              # Container image
-├── pyproject.toml          # Python project config (PEP 621)
-├── requirements.txt        # Production dependencies
-├── requirements-dev.txt    # Development dependencies
-├── Makefile                # Common development tasks
-└── .pre-commit-config.yaml # Pre-commit hooks
+├── .github/                    # GitHub Actions workflows (CI/CD, auto-version)
+├── abtesting/                  # A/B testing module
+├── ads/                        # Ad matching module
+├── analytics/                  # Real-time analytics + Kafka events
+├── audit/                      # Audit trail logging
+├── bin/                        # Executable scripts
+├── config/                     # Configuration modules + tracing
+├── core/                       # Shared schema and utilities
+│   ├── schema.py               # UniversalIntent class + enums
+│   ├── embedding_service.py    # Shared embedding service
+│   ├── exceptions.py           # Custom exceptions
+│   ├── utils.py                # Shared helpers
+│   └── vector_store.py         # Qdrant vector DB integration
+├── data/                       # Local data directory (git-ignored)
+├── demos/                      # Demo scripts
+├── docs/                       # Documentation (40+ files)
+│   ├── getting-started/        # Quick start guides (5 files)
+│   ├── deployment/             # Production deployment (6 files)
+│   ├── architecture/           # System design (4 files)
+│   ├── go-crawler/             # Go crawler docs (13 files)
+│   ├── reference/              # Technical reference (9 files)
+│   └── testing/                # Testing guides (3 files)
+├── extraction/                 # Intent extraction module
+│   ├── extractor.py            # Main extraction logic
+│   ├── constraints.py          # Constraint parsing
+│   ├── developer_assistance.py # Developer assistance
+│   ├── programming_error_detector.py # Error detection
+│   └── web_extractor.py        # Web content intent extraction
+├── fraud/                      # Fraud detection
+├── go-crawler/                 # Go-based web crawler and indexer
+├── grafana/                    # Grafana dashboards and provisioning
+├── load_testing/               # Locust load tests
+├── migrations/                 # Database migrations (4 files)
+├── pgbouncer/                  # PgBouncer configuration
+├── perf_tests/                 # Performance tests
+├── privacy/                    # Privacy compliance
+│   ├── consent_manager.py      # Consent management
+│   └── enhanced_privacy.py     # Privacy controls
+├── ranking/                    # Ranking module
+│   ├── ranker.py               # Main ranking logic
+│   ├── url_ranker.py           # URL ranking
+│   ├── optimized_ranker.py     # Optimized ranking
+│   ├── optimized_url_ranker.py # Optimized URL ranking
+│   └── scoring.py              # Alignment/quality/ethical scoring
+├── searxng/                    # SearXNG integration
+│   ├── client.py               # SearXNG client
+│   ├── query_router.py         # Intent-based query routing
+│   ├── result_aggregator.py    # Result deduplication
+│   ├── topic_expander.py       # Topic discovery
+│   └── unified_search.py       # Unified search service
+├── services/                   # Service recommendation
+├── scripts/                    # Utility scripts (38 files)
+├── tests/                      # Unit + integration tests (13 files)
+├── .env.example                # Environment variables template
+├── .gitignore                  # Git ignore rules
+├── .pre-commit-config.yaml     # Pre-commit hooks
+├── CONTRIBUTING.md             # Contribution guidelines
+├── docker-compose.yml          # Docker orchestration
+├── Dockerfile                  # Container image
+├── LICENSE                     # Intent Engine Community License
+├── main.py                     # CLI entry point
+├── main_api.py                 # FastAPI server (2700+ lines, 75+ endpoints)
+├── worker.py                   # ARQ worker
+├── database.py                 # Database models (520+ lines)
+├── models.py                   # Pydantic models (690+ lines)
+├── go_search_client.py         # Go crawler API client
+├── pyproject.toml              # Python project config (PEP 621)
+├── requirements.txt            # Production dependencies
+├── requirements-dev.txt        # Development dependencies
+├── Makefile                    # Common development tasks
+└── .pre-commit-config.yaml     # Pre-commit hooks
 ```
 
 ## Building and Running
@@ -225,32 +245,65 @@ pytest perf_tests/ -v
 
 ### API Endpoints
 
-**Core Intent:**
+**Core Intent & Search:**
+- `GET /`, `/health`, `/status`, `/metrics` - System endpoints
 - `POST /extract-intent` - Extract structured intent from query
 - `POST /search` - Unified privacy search with intent ranking
 - `POST /rank-results` - Rank results based on user intent
 - `POST /rank-urls` - Privacy-focused URL ranking
 - `POST /recommend-services` - Recommend services based on intent
 - `POST /match-ads` - Match ads with fairness validation
+- `POST /match-ads-advanced` - Advanced ad matching with campaign context
+
+**Seed Discovery & Topics:**
+- `GET /seed-discovery/status` - Get seed discovery status
+- `POST /seed-discovery/run` - Run seed discovery
+- `GET /seed-discovery/topics` - Get discovered topics
+- `POST /seed-discovery/topics/expand` - Expand topics
+- `DELETE /seed-discovery/topics/reset` - Reset topics
 
 **Campaign Management:**
 - `POST /campaigns`, `GET /campaigns/{id}`, `PUT /campaigns/{id}`, `DELETE /campaigns/{id}`
+- `GET /campaigns` - List campaigns
 - `POST /adgroups`, `GET /adgroups/{id}`, `PUT /adgroups/{id}`
+- `GET /adgroups` - List ad groups
 - `POST /ads`, `GET /ads/{id}`, `PUT /ads/{id}`, `DELETE /ads/{id}`
+- `GET /ads` - List ads
+- `POST /advertisers`, `GET /advertisers/{id}`
+- `GET /advertisers` - List advertisers
+- `POST /creatives`, `GET /creatives/{id}`, `PUT /creatives/{id}`, `DELETE /creatives/{id}`
 
-**Analytics & Reporting:**
-- `GET /reports/campaign-performance`
-- `GET /analytics/attribution/{id}`
-- `GET /analytics/campaign-roi/{id}`
-- `GET /analytics/trends/{metric}`
+**Tracking & Analytics:**
+- `POST /click-tracking`, `GET /click-tracking/{click_id}`
+- `POST /conversion-tracking`, `GET /conversion-tracking/{conversion_id}`
+- `GET /reports/campaign-performance` - Performance reports
+- `GET /analytics/attribution/{id}` - Attribution analysis
+- `GET /analytics/campaign-roi/{id}` - ROI metrics
+- `GET /analytics/trends/{metric}` - Trend analysis
+
+**Fraud Detection:**
+- `POST /fraud-detection`, `GET /fraud-detection/{id}`, `PUT /fraud-detection/{id}`
+- `GET /fraud-detection` - List fraud detections
+
+**A/B Testing:**
+- `POST /abtests`, `GET /abtests/{id}`, `PUT /abtests/{id}`, `DELETE /abtests/{id}`
+- `GET /abtests` - List tests
+- `GET /abtests/{id}/results` - Test results
+- `GET /abtests/{id}/variants` - Test variants
 
 **Privacy & Compliance:**
-- `POST /consent/record`, `GET /consent/{user_id}/{type}`
+- `POST /consent/record`, `GET /consent/{user_id}/{type}`, `POST /consent/withdraw`
+- `GET /consent-summary` - System-wide consent
+- `POST /privacy-controls/apply-retention-policy`
+- `GET /privacy-controls/compliance-report`
 - `GET /audit-events`, `GET /audit-stats`
 
-**System:**
-- `GET /`, `GET /health`, `GET /status`, `GET /metrics`
-- `GET /docs` (Swagger), `GET /redoc` (ReDoc)
+**Real-time:**
+- `WebSocket /ws/analytics` - Real-time analytics streaming
+
+**Documentation:**
+- `GET /docs` (Swagger UI)
+- `GET /redoc` (ReDoc)
 
 ## Development Conventions
 
@@ -357,6 +410,8 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:8080
 
 ## Performance Benchmarks
 
+### Core Metrics
+
 | Metric | Target | Actual | Notes |
 |--------|--------|--------|-------|
 | Warm-up Time | <100ms | ~50ms | After initial model load |
@@ -366,10 +421,32 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:8080
 | Query Router Overhead | <20ms | ~15ms | P50 latency impact |
 | Result Deduplication | 15-25% | 18% | Duplicate removal rate |
 | Cache Hit Rate | >80% | 70-80% | With Redis enabled |
+| Database Queries | <10ms | ~5ms | With connection pooling |
+
+### Load Test Results
+
+| Concurrent Users | Throughput | Success Rate | Mean Latency | P95 Latency |
+|------------------|------------|--------------|--------------|-------------|
+| **1** | 243 req/s | 100% | 16ms | 20ms |
+| **5** | 328 req/s | 100% | 53ms | 71ms |
+| **10** | 369 req/s | 100% | 84ms | 123ms |
+| **20** | 372 req/s | 100% | 183ms | 243ms |
+| **50** | 646 req/s | 72% | 205ms | 336ms |
+
+**Optimal Operating Point:** 10-20 concurrent users with 100% success rate
+
+### Self-Improving Loop Metrics
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| URLs Added (3 searches) | +634,000 | From test searches |
+| Total Crawl Queue | 1.2M+ URLs | Growing automatically |
+| Search Speed Improvement | 11x | With Redis caching |
+| Indexed Documents | 347+ | In Qdrant vector DB |
 
 ## Key Architectural Components
 
-### Query Router (Phase 1)
+### Query Router
 Intent-based backend selection:
 - Troubleshooting → SearXNG (community discussions)
 - Comparison → Go Crawler (60%) + SearXNG (40%)
@@ -389,10 +466,18 @@ Intent-based backend selection:
 - Topic extraction (TF-based)
 - Confidence scoring
 
-### Vector Store (Optional)
+### Vector Store
 - Qdrant integration
 - Intent embedding storage
 - Semantic search capabilities
+
+### Self-Improving Loop
+1. User search → Intent extraction
+2. SearXNG queries multiple engines
+3. Top URLs extracted from results
+4. URLs added to Go crawler queue
+5. Crawler indexes content with intent metadata
+6. Future searches get better local results
 
 ### Event Streaming (Optional)
 - Kafka/Redpanda integration
@@ -409,31 +494,51 @@ Intent-based backend selection:
 
 Comprehensive documentation is available in the `docs/` directory:
 
-- **Getting Started:** `docs/getting-started/`
-- **Architecture:** `docs/architecture/`
-- **Deployment:** `docs/deployment/`
-- **Go Crawler:** `docs/go-crawler/`
-- **Reference:** `docs/reference/`
-- **Testing:** `docs/testing/`
+- **Getting Started:** `docs/getting-started/` (5 files)
+- **Architecture:** `docs/architecture/` (4 files)
+- **Deployment:** `docs/deployment/` (6 files)
+- **Go Crawler:** `docs/go-crawler/` (13 files)
+- **Reference:** `docs/reference/` (9 files)
+- **Testing:** `docs/testing/` (3 files)
 
 **Key Documents:**
 - [INDEX.md](INDEX.md) - Complete documentation index
 - [README.md](README.md) - Main README
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-- [ARCHITECTURE_BLUEPRINT.md](ARCHITECTURE_BLUEPRINT.md) - Architecture design
-- [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) - Implementation guide
+- [ARCHITECTURE_BLUEPRINT.md](ARCHITECTURE_BLUEPRINT.md) - Architecture blueprint
+- [docs/architecture/PROJECT_OVERVIEW.md](docs/architecture/PROJECT_OVERVIEW.md) - Project overview
+- [docs/architecture/SELF_IMPROVING_LOOP.md](docs/architecture/SELF_IMPROVING_LOOP.md) - Self-improving loop architecture
 - [docs/reference/VERSIONING_AND_RELEASES.md](docs/reference/VERSIONING_AND_RELEASES.md) - Versioning guide
+
+**Total:** 40+ documentation files covering all aspects of the Intent Engine.
 
 ## Support
 
 - **GitHub Issues:** https://github.com/itxLikhith/intent-engine/issues
 - **Email:** likhith.anony45@gmail.com
-- **API Docs:** http://localhost:8000/docs (when running)
-- **Grafana:** http://localhost:3000 (when running)
+- **API Documentation:** http://localhost:8000/docs (Swagger UI, when running)
+- **API Documentation:** http://localhost:8000/redoc (ReDoc, when running)
+- **Grafana Dashboards:** http://localhost:3000 (when running, monitoring profile enabled)
+- **Prometheus Metrics:** http://localhost:9090 (when running, monitoring profile enabled)
 
 ## License
 
 **Intent Engine Community License (IECL) v1.0**
-- ✅ Free for Non-Commercial Purposes
-- ❌ Commercial use requires separate license
-- 📧 Contact: anony45.omnipresent@proton.me for licensing
+
+- ✅ Free for Non-Commercial Purposes (personal, educational, academic, internal evaluation)
+- ❌ Commercial use requires separate Commercial License
+- 📧 Contact: anony45.omnipresent@proton.me for Commercial Licensing
+
+**Non-Commercial Purposes include:**
+- Personal use
+- Educational purposes
+- Academic research
+- Internal evaluation
+- Open research experimentation
+
+**Commercial Use (requires separate license):**
+- Selling the Software
+- Offering as a hosted service (SaaS)
+- Integrating into paid products
+- Commercial consulting or client work
+- Any revenue-generating activity
