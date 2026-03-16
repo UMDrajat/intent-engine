@@ -5,9 +5,9 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/itxLikhith/intent-engine)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/itxLikhith/intent-engine)
 
-**Latest Release:** v2.0.0 - Self-Improving Search Loop | **Docker Image:** `anony45/intent-engine-api:latest`
+**Latest Release:** v2.1.0 - Self-Improving Search Loop | **Docker Image:** `anony45/intent-engine-api:latest`
 
 ---
 
