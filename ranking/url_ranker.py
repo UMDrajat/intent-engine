@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 import time
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
@@ -456,6 +457,29 @@ class URLAnalyzer:
         return f"{type_descriptions.get(content_type, 'Web resource')} from {domain}"
 
 
+# Global process pool for CPU-bound URL analysis
+_ranking_executor = None
+_executor_lock = asyncio.Lock()
+
+async def get_ranking_executor():
+    """Get or create the process pool executor for ranking"""
+    global _ranking_executor
+    if _ranking_executor is None:
+        async with _executor_lock:
+            if _ranking_executor is None:
+                # Use a small number of workers for CPU-bound tasks
+                import os
+                num_workers = min(os.cpu_count() or 4, 8)
+                _ranking_executor = ProcessPoolExecutor(max_workers=num_workers)
+    return _ranking_executor
+
+def analyze_url_task(url: str) -> URLAnalysisResult:
+    """
+    Top-level task for URL analysis that can be pickled for multiprocessing.
+    """
+    analyzer = URLAnalyzer()
+    return analyzer.analyze_url(url)
+
 class URLRanker:
     """
     Main URL ranking engine for privacy-focused search.
@@ -542,13 +566,17 @@ class URLRanker:
         )
 
     async def _analyze_urls_parallel(self, urls: list[str]) -> list[URLResult]:
-        """Analyze URLs in parallel using asyncio to_thread"""
+        """Analyze URLs in parallel using ProcessPoolExecutor for CPU-bound tasks"""
+        executor = await get_ranking_executor()
+        loop = asyncio.get_running_loop()
+        
+        # Run all URL analyses concurrently in the process pool
+        tasks = [loop.run_in_executor(executor, analyze_url_task, url) for url in urls]
+        analysis_results = await asyncio.gather(*tasks)
 
-        async def analyze_single(url: str) -> URLResult:
-            """Analyze a single URL in a thread pool"""
-            analysis = await asyncio.to_thread(self.url_analyzer.analyze_url, url)
-
-            return URLResult(
+        results = []
+        for analysis in analysis_results:
+            results.append(URLResult(
                 url=analysis.url,
                 title=analysis.title,
                 description=analysis.description,
@@ -561,13 +589,9 @@ class URLRanker:
                 is_non_profit=analysis.quality_indicators.get("is_non_profit", False),
                 quality_score=0.5,
                 authority_score=self._calculate_authority(analysis.domain),
-            )
+            ))
 
-        # Run all URL analyses concurrently
-        tasks = [analyze_single(url) for url in urls]
-        results = await asyncio.gather(*tasks)
-
-        return list(results)
+        return results
 
     def _apply_filters(
         self,

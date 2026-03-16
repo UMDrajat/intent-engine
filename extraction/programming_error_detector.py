@@ -799,6 +799,41 @@ class ProgrammingIntentExtractor:
 
         return use_cases
 
+    def generate_optimized_queries(self, context: ProgrammingContext) -> list[str]:
+        """
+        Generate optimized search queries based on programming context.
+        """
+        queries = []
+        lang = context.language.value if hasattr(context.language, "value") else str(context.language)
+        
+        if lang == "unknown":
+            lang = ""
+
+        # Query 1: Language + Error Message
+        if context.errorMessage:
+            queries.append(f"{lang} {context.errorMessage}".strip())
+
+        # Query 2: Language + Error Type + Error Message
+        if context.errorType != ErrorType.UNKNOWN:
+            error_type = context.errorType.value if hasattr(context.errorType, "value") else str(context.errorType)
+            queries.append(f"{lang} {error_type} {context.errorMessage}".strip())
+
+        # Query 3: Framework + Error Message
+        if context.framework and context.errorMessage:
+            queries.append(f"{context.framework} {context.errorMessage}")
+
+        # Query 4: Language + Error Code
+        if context.errorCode:
+            queries.append(f"{lang} {context.errorCode}")
+
+        # Deduplicate and limit
+        unique_queries = []
+        for q in queries:
+            if q and q not in unique_queries:
+                unique_queries.append(q)
+        
+        return unique_queries[:3]
+
 
 # Singleton instance
 _programming_intent_extractor = None

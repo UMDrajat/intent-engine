@@ -104,40 +104,49 @@ class UnifiedSearchService:
         # Record query for topic learning (async, non-blocking)
         asyncio.create_task(self._safe_add_search_query(request.query))
 
-        # Step 1: Extract intent (if enabled)
+        # Step 1 & 2: Extract intent and execute initial search in parallel
+        # This reduces latency by overlapping intent analysis with network I/O
+        intent_task = None
+        if request.extract_intent:
+            intent_task = asyncio.create_task(
+                asyncio.to_thread(self._extract_intent_with_error_handling, request.query)
+            )
+
+        # Start with a default search while intent is being extracted
+        # If intent extraction is fast, we might use its results for routing
+        from searxng.query_router import QueryRoute, SearchBackend
+
+        default_route = QueryRoute(
+            backends=[SearchBackend.GO_CRAWLER, SearchBackend.SEARXNG],
+            weights={SearchBackend.GO_CRAWLER: 0.5, SearchBackend.SEARXNG: 0.5},
+            parallel=True,
+            max_results_per_backend=request.max_results or 20,
+        )
+
+        # Execute search and intent extraction in parallel
+        search_task = asyncio.create_task(self.query_router.execute_search(route=default_route, query=request.query))
+
+        # Wait for intent if it's still running (it usually is)
         universal_intent = None
         extracted_intent = None
-
-        if request.extract_intent:
+        if intent_task:
             try:
-                intent_result = await asyncio.to_thread(self._extract_intent_with_error_handling, request.query)
+                intent_result = await intent_task
                 if intent_result and hasattr(intent_result, "intent"):
                     universal_intent = intent_result.intent
                     extracted_intent = self._convert_to_extracted_intent(universal_intent)
                     logger.info(
                         f"Intent extracted: goal={extracted_intent.goal}, use_cases={extracted_intent.use_cases}"
                     )
+                    
+                    # If intent suggests a different route than default, we could trigger 
+                    # supplemental searches here if needed. For now, we use default + intent-based ranking.
             except Exception as e:
                 logger.warning(f"Intent extraction failed: {e}")
 
-        # Step 2: Route query based on intent (NEW - Query Router)
-        if universal_intent:
-            query_route = self.query_router.route(universal_intent)
-            logger.info(f"Query routed to: {[b.value for b in query_route.backends]}, parallel={query_route.parallel}")
-        else:
-            # Default route without intent
-            from searxng.query_router import QueryRoute, SearchBackend
-
-            query_route = QueryRoute(
-                backends=[SearchBackend.GO_CRAWLER, SearchBackend.SEARXNG],
-                weights={SearchBackend.GO_CRAWLER: 0.5, SearchBackend.SEARXNG: 0.5},
-                parallel=True,
-                max_results_per_backend=request.max_results or 20,
-            )
-
-        # Step 3: Execute federated search (NEW - Query Router)
+        # Step 3: Wait for federated search results
         try:
-            raw_results = await self.query_router.execute_search(route=query_route, query=request.query)
+            raw_results = await search_task
             logger.info(f"Federated search returned {len(raw_results)} raw results")
         except Exception as e:
             logger.error(f"Federated search failed: {e}")
@@ -193,8 +202,8 @@ class UnifiedSearchService:
         response.metrics = {
             "backend_distribution": backend_distribution,
             "aggregation_ratio": len(aggregated_results) / len(raw_results) if raw_results else 0,
-            "routing_strategy": str([b.value for b in query_route.backends]),
-            "parallel_execution": query_route.parallel,
+            "routing_strategy": str([b.value for b in default_route.backends]),
+            "parallel_execution": default_route.parallel,
         }
 
         logger.info(f"Unified search (v2) complete: {len(response.results)} results in {processing_time_ms:.2f}ms")
@@ -311,12 +320,27 @@ class UnifiedSearchService:
             try:
                 engine = get_developer_assistance_engine()
                 assistance = engine.generate_assistance_response(universal_intent)
+                
+                # Get optimized queries from programming extractor if possible
+                from extraction.programming_error_detector import get_programming_intent_extractor
+                prog_extractor = get_programming_intent_extractor()
+                optimized_queries = prog_extractor.generate_optimized_queries(ctx)
+                
                 if assistance.research_plan:
                     rp = assistance.research_plan
+                    # Merge optimized queries
+                    final_queries = list(set(optimized_queries + rp.optimized_search_queries))
+                    
                     research_plan_dict = {
                         "investigation_steps": rp.investigation_steps,
-                        "optimized_search_queries": rp.optimized_search_queries,
+                        "optimized_search_queries": final_queries[:5],
                         "key_concepts": rp.key_concepts,
+                    }
+                elif optimized_queries:
+                    research_plan_dict = {
+                        "investigation_steps": ["Search for the error message", "Analyze community solutions"],
+                        "optimized_search_queries": optimized_queries,
+                        "key_concepts": [ctx.language.value] if hasattr(ctx.language, "value") else [str(ctx.language)],
                     }
             except Exception as e:
                 logger.warning(f"Failed to generate research plan: {e}")

@@ -13,6 +13,8 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 import httpx
+import time
+from enum import Enum
 
 try:
     import redis
@@ -23,6 +25,45 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+class CircuitState(Enum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+class CircuitBreaker:
+    """
+    Circuit breaker for external service calls.
+    """
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 30.0):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failures = 0
+        self.state = CircuitState.CLOSED
+        self.last_failure_time = 0.0
+
+    def record_failure(self):
+        self.failures += 1
+        self.last_failure_time = time.time()
+        if self.failures >= self.failure_threshold:
+            self.state = CircuitState.OPEN
+            logger.error(f"Circuit breaker opened due to {self.failures} failures")
+
+    def record_success(self):
+        self.failures = 0
+        self.state = CircuitState.CLOSED
+
+    def can_execute(self) -> bool:
+        if self.state == CircuitState.CLOSED:
+            return True
+        
+        if self.state == CircuitState.OPEN:
+            if time.time() - self.last_failure_time > self.recovery_timeout:
+                self.state = CircuitState.HALF_OPEN
+                logger.info("Circuit breaker entering half-open state")
+                return True
+            return False
+        
+        return True # HALF_OPEN
 
 @dataclass
 class SearXNGResult:
@@ -106,6 +147,9 @@ class SearXNGClient:
             limits=limits,
             http2=True,  # Enable HTTP/2 for better performance
         )
+        
+        # Initialize circuit breaker
+        self.circuit_breaker = CircuitBreaker()
 
         logger.info(
             f"SearXNG client initialized with base URL: {self.base_url}, "
@@ -142,6 +186,20 @@ class SearXNGClient:
         Raises:
             httpx.RequestError: If the request fails
         """
+        # Check circuit breaker
+        if not self.circuit_breaker.can_execute():
+            logger.warning(f"Circuit breaker is OPEN. Skipping SearXNG request for query: {query[:50]}")
+            return SearXNGResponse(
+                query=query,
+                results=[],
+                number_of_results=0,
+                suggestions=[],
+                corrections=[],
+                infoboxes=[],
+                processing_time=0.0,
+                engines=[],
+            )
+
         # Generate cache key from query parameters
         cache_key_data = f"{query}:{categories}:{engines}:{language}:{pageno}:{safe_search}:{time_range}"
         cache_key = f"searxng:search:{hashlib.md5(cache_key_data.encode()).hexdigest()}"
@@ -181,6 +239,9 @@ class SearXNGClient:
             logger.debug(f"Searching SearXNG: query='{query}', categories={categories}")
             response = await self._client.get(f"{self.base_url}/search", params=params)
             response.raise_for_status()
+
+            # Record success in circuit breaker
+            self.circuit_breaker.record_success()
 
             data = response.json()
             results_count = len(data.get("results", [])) if data.get("results") else 0
@@ -227,12 +288,34 @@ class SearXNGClient:
 
             return response_obj
 
-        except httpx.RequestError as e:
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
+            # Record failure in circuit breaker
+            self.circuit_breaker.record_failure()
             logger.error(f"SearXNG request failed: {e}")
-            raise
+            
+            # Return empty response instead of raising to keep system running
+            return SearXNGResponse(
+                query=query,
+                results=[],
+                number_of_results=0,
+                suggestions=[],
+                corrections=[],
+                infoboxes=[],
+                processing_time=0.0,
+                engines=[],
+            )
         except Exception as e:
             logger.error(f"Error parsing SearXNG response: {e}")
-            raise
+            return SearXNGResponse(
+                query=query,
+                results=[],
+                number_of_results=0,
+                suggestions=[],
+                corrections=[],
+                infoboxes=[],
+                processing_time=0.0,
+                engines=[],
+            )
 
     def _parse_results(self, raw_results: list[dict[str, Any]]) -> list[SearXNGResult]:
         """Parse raw search results into SearXNGResult objects."""
