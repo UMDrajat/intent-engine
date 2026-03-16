@@ -362,9 +362,9 @@ class ProgrammingLanguageDetector:
         # Normalize confidence (0-1) using power scaling to satisfy test thresholds
         total_score = sum(scores.values())
         purity = best_score / max(total_score, 1)
-        
+
         # Power scaling: 1.0 -> 1.0, 0.5 -> 0.75, 0.25 -> 0.57
-        confidence = purity ** 0.4
+        confidence = purity**0.4
 
         # Minimum threshold
         if confidence < 0.3:
@@ -597,7 +597,7 @@ class CodeSnippetDetector:
             # Check if this inline match is inside any block match
             start, end = match.span()
             is_inside_block = any(b_start <= start and end <= b_end for b_start, b_end in block_ranges)
-            
+
             if not is_inside_block:
                 code = match.group(1).strip()
                 # Only add if it looks like code (has programming characters)
@@ -762,7 +762,9 @@ class ProgrammingIntentExtractor:
         text_lower = text.lower()
 
         # Check for error/exception keywords
-        if re.search(r"\b(error|exception|bug|not working|broken|fix)\b|\w+(Error|Exception)\b", text_lower, re.IGNORECASE):
+        if re.search(
+            r"\b(error|exception|bug|not working|broken|fix)\b|\w+(Error|Exception)\b", text_lower, re.IGNORECASE
+        ):
             return IntentGoal.PROGRAMMING_ERROR
 
         # Check for debugging keywords
