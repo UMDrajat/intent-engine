@@ -31,7 +31,7 @@ from models import (
     UnifiedSearchResponse,
 )
 from ranking.url_ranker import URLRankingRequest, rank_urls
-from searxng.client import SearXNGResult, get_searxng_client
+from searxng.client import get_searxng_client
 from searxng.query_router import (
     SearchResult as RouterSearchResult,
 )
@@ -70,6 +70,7 @@ class UnifiedSearchService:
         """Safely add search query to topic expander in background."""
         try:
             from searxng.topic_expander import get_topic_expander
+
             expander = get_topic_expander()
             await expander.add_search_query(query)
         except Exception as e:
