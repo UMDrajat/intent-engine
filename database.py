@@ -416,7 +416,9 @@ class ABTestAssignment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     test_id = Column(Integer, ForeignKey("ab_tests.id"), nullable=False, index=True)
-    variant_id = Column(Integer, ForeignKey("ab_test_variants.id"), nullable=False)  # Index created via composite in __table_args__
+    variant_id = Column(
+        Integer, ForeignKey("ab_test_variants.id"), nullable=False
+    )  # Index created via composite in __table_args__
     user_hash = Column(String, nullable=False, index=True)  # Hashed user/session identifier
     assigned_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
