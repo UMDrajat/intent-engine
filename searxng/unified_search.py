@@ -124,7 +124,7 @@ class UnifiedSearchService:
                 try:
                     # Wait up to 200ms for intent extraction (usually takes <50ms)
                     intent_result = await asyncio.wait_for(asyncio.shield(intent_task), timeout=0.2)
-                except (asyncio.TimeoutError, Exception):
+                except (TimeoutError, Exception):
                     # If it takes longer, we'll continue with default routing
                     # and wait for intent_task later for ranking
                     logger.debug("Intent extraction taking >200ms or failed, proceeding with default routing")
@@ -512,7 +512,7 @@ class UnifiedSearchService:
                 urls_to_rank = [r.url for r in candidates_to_rank]
                 titles_to_rank = [r.title for r in candidates_to_rank]
                 contents_to_rank = [r.content for r in candidates_to_rank]
-                
+
                 ranking_request = URLRankingRequest(
                     query=request.query,
                     urls=urls_to_rank,
@@ -540,7 +540,7 @@ class UnifiedSearchService:
 
                     # Keep the rest with their original scores but lower than ranked ones
                     # or just re-sort the whole list
-                    
+
                     # Re-sort by ranked score
                     ranked_results.sort(key=lambda r: r.ranked_score, reverse=True)
 

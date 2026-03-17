@@ -683,22 +683,22 @@ class IntentRanker:
             return
 
         texts_to_encode = []
-        
+
         # 1. Query-content texts
         for c in candidates:
             content = f"{c.title} {c.description}".strip()
             if content:
                 texts_to_encode.append(content)
-        
+
         # 2. Use case tags text
         for c in candidates:
             if c.tags:
                 texts_to_encode.append(" ".join(c.tags).lower())
-        
+
         # 3. Intent query and use cases
         if intent.declared.query:
             texts_to_encode.append(intent.declared.query)
-        
+
         if intent.inferred.useCases:
             for uc in intent.inferred.useCases:
                 texts_to_encode.append(uc.value.replace("_", " "))
