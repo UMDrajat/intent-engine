@@ -715,12 +715,12 @@ async def embed_endpoint(request: dict[str, Any]):
     Expected request: {"text": "some text"} or {"texts": ["text1", "text2"]}
     """
     from core.embedding_service import get_embedding_service
-    
+
     text_data = request.get("text")
     texts_data = request.get("texts")
-    
+
     service = get_embedding_service()
-    
+
     if text_data:
         embedding = service.encode_text(text_data)
         return {"embedding": embedding.tolist() if embedding is not None else None}
