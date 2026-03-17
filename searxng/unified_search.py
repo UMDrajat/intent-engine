@@ -462,6 +462,8 @@ class UnifiedSearchService:
                 category=agg_result.metadata.get("category", "general"),
                 thumbnail=None,
                 published_date=agg_result.metadata.get("published_date"),
+                price=agg_result.metadata.get("price"),
+                currency=agg_result.metadata.get("currency"),
                 intent_goal=(
                     universal_intent.declared.goal.value
                     if universal_intent and universal_intent.declared and universal_intent.declared.goal
@@ -472,6 +474,12 @@ class UnifiedSearchService:
                 ethical_alignment=None,
             )
             ranked_results.append(ranked_result)
+
+        # Step 5: Enrich with dynamic data if needed (PURCHASE intent)
+        if universal_intent and universal_intent.declared and universal_intent.declared.goal:
+            goal_value = universal_intent.declared.goal.value if hasattr(universal_intent.declared.goal, "value") else str(universal_intent.declared.goal)
+            if goal_value == "purchase":
+                await self._enrich_with_dynamic_data(ranked_results)
 
         # Apply intent-based ranking if enabled
         if request.rank_results and universal_intent and ranked_results:
@@ -543,6 +551,53 @@ class UnifiedSearchService:
             source = result.source.value
             distribution[source] = distribution.get(source, 0) + 1
         return distribution
+
+    async def _enrich_with_dynamic_data(self, ranked_results: list[RankedSearchResult]):
+        """
+        Enrich search results with dynamic data (price, etc.) from Redis.
+        If data is missing, enqueue a background task to scrape it.
+        """
+        try:
+            import json
+            import redis
+            from arq import create_pool
+            from arq.connections import RedisSettings
+
+            # Use Redis for caching and task enqueuing
+            redis_client = redis.Redis(host="redis", port=6379, decode_responses=True)
+            arq_pool = await create_pool(RedisSettings(host="redis", port=6379))
+
+            # Dynamic domains that definitely need Playwright
+            dynamic_domains = ["amazon.", "flipkart.", "ebay.", "walmart.", "bestbuy."]
+
+            for result in ranked_results[:10]:  # Only enrich top 10 for performance
+                url = result.url
+                domain = url.split("/")[2].lower() if "/" in url else url.lower()
+
+                # 1. Check if we already have dynamic data in Redis
+                key = f"dynamic_scrape:{url}"
+                cached_data = redis_client.get(key)
+
+                if cached_data:
+                    data = json.loads(cached_data)
+                    result.price = data.get("price")
+                    result.currency = data.get("currency")
+                    result.is_dynamic = True
+                    logger.debug(f"Enriched {url} from cache: price={result.price}")
+                else:
+                    # 2. If missing, check if it's a dynamic domain or a shopping URL
+                    is_dynamic_domain = any(d in domain for d in dynamic_domains)
+                    
+                    if is_dynamic_domain:
+                        # Enqueue background task for future users
+                        await arq_pool.enqueue_job("scrape_dynamic_url", url)
+                        logger.debug(f"Enqueued dynamic scraping for {url}")
+
+            await arq_pool.close()
+            redis_client.close()
+
+        except Exception as e:
+            logger.warning(f"Failed to enrich results with dynamic data: {e}")
 
 
 # Singleton instance

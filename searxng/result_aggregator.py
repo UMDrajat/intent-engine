@@ -240,6 +240,19 @@ class ResultAggregator:
 
         # Merge metadata
         merged_metadata = {}
+        # Find price/currency (prioritize first result that has price)
+        price = None
+        currency = None
+        for r in results:
+            if hasattr(r, "price") and r.price:
+                price = r.price
+                currency = r.currency
+                break
+
+        if price:
+            merged_metadata["price"] = price
+            merged_metadata["currency"] = currency
+
         for r in results:
             if r.metadata:
                 merged_metadata.update(r.metadata)

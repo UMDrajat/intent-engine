@@ -66,6 +66,7 @@ services:
       - RATE_LIMIT_DEFAULT=100/minute
       - RATE_LIMIT_STRICT=10/minute
       - SEARXNG_BASE_URL=http://searxng:8080
+      - PLAYWRIGHT_BROWSERS_PATH=/app/pw-browsers
     volumes:
       - ./data:/app/data
     restart: unless-stopped
@@ -306,6 +307,7 @@ services:
       - PGBOUNCER_ENABLED=false
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - PLAYWRIGHT_BROWSERS_PATH=/app/pw-browsers
     networks:
       - intent-network
       - searxng

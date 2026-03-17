@@ -23,6 +23,8 @@ class GoSearchResult:
     content: str
     score: float
     rank: int
+    price: float | None = None
+    currency: str | None = None
     match_reasons: list[str] | None = None
 
 
@@ -101,6 +103,8 @@ class GoSearchClient:
                         content=r.get("content", ""),
                         score=r.get("score", 0.0),
                         rank=r.get("rank", i + 1),
+                        price=r.get("price"),
+                        currency=r.get("currency"),
                         match_reasons=r.get("match_reasons"),
                     )
                     for i, r in enumerate(data.get("results", []))

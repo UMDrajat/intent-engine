@@ -26,3 +26,5 @@ limits==3.6.0  # Rate limiting utilities
 arq==0.25.0
 dataclasses-json==0.6.4
 aiohttp==3.9.1  # For async HTTP health checks
+playwright==1.42.0
+playwright-stealth==1.0.6

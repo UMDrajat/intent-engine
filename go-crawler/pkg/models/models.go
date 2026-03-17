@@ -22,6 +22,8 @@ type CrawledPage struct {
 	PageRank        float64   `json:"pagerank"`
 	Language        string    `json:"language"`
 	IsIndexed       bool      `json:"is_indexed"`
+	Price           float64   `json:"price,omitempty"`
+	Currency        string    `json:"currency,omitempty"`
 	CrawledAt       time.Time `json:"crawled_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 	NextCrawlAt     time.Time `json:"next_crawl_at"`
@@ -47,6 +49,8 @@ type SearchDocument struct {
 	TermFrequencies map[string]int `json:"term_frequencies"`
 	WordCount       int            `json:"word_count"`
 	PageRank        float64        `json:"pagerank"`
+	Price           float64        `json:"price,omitempty"`
+	Currency        string         `json:"currency,omitempty"`
 	IndexedAt       time.Time      `json:"indexed_at"`
 }
 
@@ -58,6 +62,8 @@ type SearchResult struct {
 	Snippet      string   `json:"snippet"`
 	Score        float64  `json:"score"`
 	PageRank     float64  `json:"pagerank"`
+	Price        float64  `json:"price,omitempty"`
+	Currency     string   `json:"currency,omitempty"`
 	MatchedTerms []string `json:"matched_terms"`
 }
 

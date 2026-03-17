@@ -40,6 +40,8 @@ class WebIntent:
     confidence: float = 0.5
     title: str | None = None
     description: str | None = None
+    price: float | None = None
+    currency: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
@@ -54,6 +56,8 @@ class WebIntent:
             "confidence": self.confidence,
             "title": self.title,
             "description": self.description,
+            "price": self.price,
+            "currency": self.currency,
         }
 
 
@@ -364,6 +368,15 @@ class WebIntentExtractor:
         # Extract topics (simple TF-based)
         topics = self._extract_topics(content_lower)
 
+        # Extract price (Phase 1 Light)
+        price_data = self._extract_price(content_lower)
+        price = price_data.get("price") if price_data else None
+        currency = price_data.get("currency") if price_data else None
+
+        # Re-detect goal if price is found
+        if price and primary_goal != IntentGoal.PURCHASE:
+            primary_goal = IntentGoal.PURCHASE
+
         # Calculate confidence
         confidence = self._calculate_confidence(primary_goal, use_cases, topics)
 
@@ -378,7 +391,54 @@ class WebIntentExtractor:
             confidence=confidence,
             title=title,
             description=description,
+            price=price,
+            currency=currency,
         )
+
+    def _extract_price(self, content: str) -> dict | None:
+        """
+        Extract price and currency from content using regex.
+        Matches formats like $99.99, 99.99 €, £99.99, etc.
+        """
+        # Common price patterns
+        # 1. Symbol first: $99.99, £99, ₹1,500
+        pattern1 = re.compile(r"(\$|£|€|₹|Rs\.?\s?)\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)")
+        # 2. Symbol last: 99.99 €, 99€
+        pattern2 = re.compile(r"(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\s?(\$|£|€|₹)")
+
+        match = pattern1.search(content)
+        if match:
+            currency_symbol = match.group(1).strip()
+            price_str = match.group(2).replace(",", "")
+            return self._format_price_data(price_str, currency_symbol)
+
+        match = pattern2.search(content)
+        if match:
+            price_str = match.group(1).replace(",", "")
+            currency_symbol = match.group(2).strip()
+            return self._format_price_data(price_str, currency_symbol)
+
+        return None
+
+    def _format_price_data(self, price_str: str, currency_symbol: str) -> dict | None:
+        """Format raw price string and currency symbol into structured data"""
+        try:
+            # Normalize currency
+            currency_map = {
+                "$": "USD",
+                "£": "GBP",
+                "€": "EUR",
+                "₹": "INR",
+                "Rs": "INR"
+            }
+            currency = currency_map.get(currency_symbol, currency_symbol)
+            
+            return {
+                "price": float(price_str),
+                "currency": currency
+            }
+        except (ValueError, TypeError):
+            return None
 
     def _detect_goal(self, content: str) -> IntentGoal:
         """Detect primary intent goal from content"""

@@ -58,6 +58,8 @@ class SearchResult:
     content: str
     score: float
     engine: str | None = None
+    price: float | None = None
+    currency: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,6 +71,8 @@ class SearchResult:
             "content": self.content,
             "score": self.score,
             "engine": self.engine,
+            "price": self.price,
+            "currency": self.currency,
             "metadata": self.metadata,
         }
 
@@ -324,6 +328,8 @@ class UnifiedQueryRouter:
                         content=r.content,
                         score=r.score,
                         engine="go-crawler",
+                        price=r.price,
+                        currency=r.currency,
                         metadata={
                             "rank": r.rank,
                             "match_reasons": r.match_reasons or [],
@@ -345,9 +351,12 @@ class UnifiedQueryRouter:
     async def _search_searxng(self, query: str, max_results: int) -> list[SearchResult]:
         """Search SearXNG"""
         from searxng.client import get_searxng_client
+        from extraction.web_extractor import get_web_intent_extractor
 
         try:
             client = get_searxng_client(self._get_searxng_url())
+            intent_extractor = get_web_intent_extractor()
+            
             response = await client.search(
                 query=query,
                 categories=self.searxng_categories,
@@ -357,24 +366,37 @@ class UnifiedQueryRouter:
             if not response or not response.results:
                 return []
 
-            results = [
-                SearchResult(
-                    source=SearchBackend.SEARXNG,
-                    url=r.url,
-                    title=r.title,
-                    content=r.content,
-                    score=r.score,
-                    engine=r.engine,
-                    metadata={
-                        "category": r.category,
-                        "published_date": r.published_date,
-                        "position": r.position,
-                    },
+            results = []
+            for r in response.results[:max_results]:
+                # Phase 1 Light Price Extraction from snippet
+                price = None
+                currency = None
+                
+                # Try to extract price from snippet/content
+                price_data = intent_extractor._extract_price(r.content or "")
+                if price_data:
+                    price = price_data.get("price")
+                    currency = price_data.get("currency")
+                
+                results.append(
+                    SearchResult(
+                        source=SearchBackend.SEARXNG,
+                        url=r.url,
+                        title=r.title,
+                        content=r.content,
+                        score=r.score,
+                        engine=r.engine,
+                        price=price,
+                        currency=currency,
+                        metadata={
+                            "category": r.category,
+                            "published_date": r.published_date,
+                            "position": r.position,
+                        },
+                    )
                 )
-                for r in response.results[:max_results]
-            ]
 
-            logger.debug(f"SearXNG returned {len(results)} results")
+            logger.debug(f"SearXNG returned {len(results)} results with {len([res for res in results if res.price])} light price extractions")
             return results
 
         except Exception as e:

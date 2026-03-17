@@ -659,6 +659,9 @@ class RankedSearchResult(BaseModel):
     match_reasons: list[str] = []
     privacy_score: float | None = None
     ethical_alignment: float | None = None
+    price: float | None = None
+    currency: str | None = None
+    is_dynamic: bool = False
 
 
 class ExtractedIntent(BaseModel):
