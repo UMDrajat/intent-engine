@@ -1,6 +1,8 @@
 import json
+
 from arq import create_pool
 from arq.connections import RedisSettings
+
 from scrapers.dynamic_worker import scrape_dynamic_product
 
 REDIS_HOST = "redis"

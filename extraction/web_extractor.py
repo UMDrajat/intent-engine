@@ -424,19 +424,10 @@ class WebIntentExtractor:
         """Format raw price string and currency symbol into structured data"""
         try:
             # Normalize currency
-            currency_map = {
-                "$": "USD",
-                "£": "GBP",
-                "€": "EUR",
-                "₹": "INR",
-                "Rs": "INR"
-            }
+            currency_map = {"$": "USD", "£": "GBP", "€": "EUR", "₹": "INR", "Rs": "INR"}
             currency = currency_map.get(currency_symbol, currency_symbol)
-            
-            return {
-                "price": float(price_str),
-                "currency": currency
-            }
+
+            return {"price": float(price_str), "currency": currency}
         except (ValueError, TypeError):
             return None
 

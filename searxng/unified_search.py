@@ -477,7 +477,11 @@ class UnifiedSearchService:
 
         # Step 5: Enrich with dynamic data if needed (PURCHASE intent)
         if universal_intent and universal_intent.declared and universal_intent.declared.goal:
-            goal_value = universal_intent.declared.goal.value if hasattr(universal_intent.declared.goal, "value") else str(universal_intent.declared.goal)
+            goal_value = (
+                universal_intent.declared.goal.value
+                if hasattr(universal_intent.declared.goal, "value")
+                else str(universal_intent.declared.goal)
+            )
             if goal_value == "purchase":
                 await self._enrich_with_dynamic_data(ranked_results)
 
@@ -559,6 +563,7 @@ class UnifiedSearchService:
         """
         try:
             import json
+
             import redis
             from arq import create_pool
             from arq.connections import RedisSettings
@@ -587,7 +592,7 @@ class UnifiedSearchService:
                 else:
                     # 2. If missing, check if it's a dynamic domain or a shopping URL
                     is_dynamic_domain = any(d in domain for d in dynamic_domains)
-                    
+
                     if is_dynamic_domain:
                         # Enqueue background task for future users
                         await arq_pool.enqueue_job("scrape_dynamic_url", url)

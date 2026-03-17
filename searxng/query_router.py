@@ -350,13 +350,13 @@ class UnifiedQueryRouter:
 
     async def _search_searxng(self, query: str, max_results: int) -> list[SearchResult]:
         """Search SearXNG"""
-        from searxng.client import get_searxng_client
         from extraction.web_extractor import get_web_intent_extractor
+        from searxng.client import get_searxng_client
 
         try:
             client = get_searxng_client(self._get_searxng_url())
             intent_extractor = get_web_intent_extractor()
-            
+
             response = await client.search(
                 query=query,
                 categories=self.searxng_categories,
@@ -371,13 +371,13 @@ class UnifiedQueryRouter:
                 # Phase 1 Light Price Extraction from snippet
                 price = None
                 currency = None
-                
+
                 # Try to extract price from snippet/content
                 price_data = intent_extractor._extract_price(r.content or "")
                 if price_data:
                     price = price_data.get("price")
                     currency = price_data.get("currency")
-                
+
                 results.append(
                     SearchResult(
                         source=SearchBackend.SEARXNG,
@@ -396,7 +396,9 @@ class UnifiedQueryRouter:
                     )
                 )
 
-            logger.debug(f"SearXNG returned {len(results)} results with {len([res for res in results if res.price])} light price extractions")
+            logger.debug(
+                f"SearXNG returned {len(results)} results with {len([res for res in results if res.price])} light price extractions"
+            )
             return results
 
         except Exception as e:
