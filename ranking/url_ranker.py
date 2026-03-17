@@ -69,6 +69,8 @@ class URLRankingRequest:
 
     query: str  # The search query
     urls: list[str]  # List of URLs to rank
+    titles: list[str] | None = None  # List of result titles (optional)
+    contents: list[str] | None = None  # List of result snippets (optional)
     intent: UniversalIntent | None = None  # Optional structured intent
     options: dict[str, Any] | None = None  # Ranking options
 
@@ -540,6 +542,14 @@ class URLRanker:
 
         # Step 1: Analyze all URLs in parallel
         analyzed_urls = await self._analyze_urls_parallel(urls)
+
+        # Step 1.5: Merge provided titles and contents if available
+        if request.titles or request.contents:
+            for i, result in enumerate(analyzed_urls):
+                if request.titles and i < len(request.titles) and request.titles[i]:
+                    result.title = request.titles[i]
+                if request.contents and i < len(request.contents) and request.contents[i]:
+                    result.description = request.contents[i]
 
         # Step 2: Filter URLs based on constraints
         filtered_urls = self._apply_filters(

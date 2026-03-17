@@ -562,6 +562,8 @@ class FraudScanSummary(BaseModel):
 class URLRankingAPIRequest(BaseModel):
     query: str
     urls: list[str]
+    titles: list[str] | None = None
+    contents: list[str] | None = None
     intent: UniversalIntent | None = None
     options: dict[str, Any] | None = None
 

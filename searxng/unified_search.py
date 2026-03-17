@@ -104,45 +104,64 @@ class UnifiedSearchService:
         # Record query for topic learning (async, non-blocking)
         asyncio.create_task(self._safe_add_search_query(request.query))
 
-        # Step 1 & 2: Extract intent and execute initial search in parallel
-        # This reduces latency by overlapping intent analysis with network I/O
-        intent_task = None
-        if request.extract_intent:
-            intent_task = asyncio.create_task(
-                asyncio.to_thread(self._extract_intent_with_error_handling, request.query)
-            )
-
-        # Start with a default search while intent is being extracted
-        # If intent extraction is fast, we might use its results for routing
-        from searxng.query_router import QueryRoute, SearchBackend
-
-        default_route = QueryRoute(
-            backends=[SearchBackend.GO_CRAWLER, SearchBackend.SEARXNG],
-            weights={SearchBackend.GO_CRAWLER: 0.5, SearchBackend.SEARXNG: 0.5},
-            parallel=True,
-            max_results_per_backend=request.max_results or 20,
-        )
-
-        # Execute search and intent extraction in parallel
-        search_task = asyncio.create_task(self.query_router.execute_search(route=default_route, query=request.query))
-
-        # Wait for intent if it's still running (it usually is)
+        # Step 1: Extract intent (with caching and optimized routing wait)
         universal_intent = None
         extracted_intent = None
-        if intent_task:
+        intent_task = None
+        intent_result = None
+
+        if request.extract_intent:
+            # Check cache first (instant)
+            intent_result = extract_intent_cached(request.query)
+
+            if not intent_result:
+                # If not in cache, start background extraction
+                intent_task = asyncio.create_task(
+                    asyncio.to_thread(self._extract_intent_with_error_handling, request.query)
+                )
+
+                # Phase 1 Optimization: Wait briefly for intent to allow optimized routing
+                try:
+                    # Wait up to 200ms for intent extraction (usually takes <50ms)
+                    intent_result = await asyncio.wait_for(asyncio.shield(intent_task), timeout=0.2)
+                except (asyncio.TimeoutError, Exception):
+                    # If it takes longer, we'll continue with default routing
+                    # and wait for intent_task later for ranking
+                    logger.debug("Intent extraction taking >200ms or failed, proceeding with default routing")
+
+        # Step 2: Determine Route based on intent if available
+        from searxng.query_router import QueryRoute, SearchBackend
+
+        if intent_result and hasattr(intent_result, "intent"):
+            universal_intent = intent_result.intent
+            extracted_intent = self._convert_to_extracted_intent(universal_intent)
+            route = self.query_router.route(universal_intent)
+            logger.info(f"Using optimized intent-based route: {[b.value for b in route.backends]}")
+        else:
+            # Default fallback route
+            route = QueryRoute(
+                backends=[SearchBackend.GO_CRAWLER, SearchBackend.SEARXNG],
+                weights={SearchBackend.GO_CRAWLER: 0.5, SearchBackend.SEARXNG: 0.5},
+                parallel=True,
+                max_results_per_backend=request.max_results or 20,
+            )
+            logger.debug("Using default hybrid routing")
+
+        # Execute search across backends
+        search_task = asyncio.create_task(self.query_router.execute_search(route=route, query=request.query))
+
+        # Wait for intent if it's still running (e.g., if we timed out waiting for it above)
+        if request.extract_intent and not intent_result and intent_task:
             try:
                 intent_result = await intent_task
                 if intent_result and hasattr(intent_result, "intent"):
                     universal_intent = intent_result.intent
                     extracted_intent = self._convert_to_extracted_intent(universal_intent)
                     logger.info(
-                        f"Intent extracted: goal={extracted_intent.goal}, use_cases={extracted_intent.use_cases}"
+                        f"Intent extracted (late): goal={extracted_intent.goal}, use_cases={extracted_intent.use_cases}"
                     )
-
-                    # If intent suggests a different route than default, we could trigger
-                    # supplemental searches here if needed. For now, we use default + intent-based ranking.
             except Exception as e:
-                logger.warning(f"Intent extraction failed: {e}")
+                logger.warning(f"Late intent extraction failed: {e}")
 
         # Step 3: Wait for federated search results
         try:
@@ -202,8 +221,8 @@ class UnifiedSearchService:
         response.metrics = {
             "backend_distribution": backend_distribution,
             "aggregation_ratio": len(aggregated_results) / len(raw_results) if raw_results else 0,
-            "routing_strategy": str([b.value for b in default_route.backends]),
-            "parallel_execution": default_route.parallel,
+            "routing_strategy": str([b.value for b in route.backends]),
+            "parallel_execution": route.parallel,
         }
 
         logger.info(f"Unified search (v2) complete: {len(response.results)} results in {processing_time_ms:.2f}ms")
@@ -485,13 +504,20 @@ class UnifiedSearchService:
             if goal_value == "purchase":
                 await self._enrich_with_dynamic_data(ranked_results)
 
-        # Apply intent-based ranking if enabled
+        # Apply intent-based ranking if enabled (Optimized with Top-K)
         if request.rank_results and universal_intent and ranked_results:
             try:
-                urls_to_rank = [r.url for r in ranked_results]
+                # Top-K Optimization: Only rank the top 40 candidates to improve P99 latency
+                candidates_to_rank = ranked_results[:40]
+                urls_to_rank = [r.url for r in candidates_to_rank]
+                titles_to_rank = [r.title for r in candidates_to_rank]
+                contents_to_rank = [r.content for r in candidates_to_rank]
+                
                 ranking_request = URLRankingRequest(
                     query=request.query,
                     urls=urls_to_rank,
+                    titles=titles_to_rank,
+                    contents=contents_to_rank,
                     intent=universal_intent,
                     options={
                         "weights": request.weights,
@@ -505,10 +531,16 @@ class UnifiedSearchService:
                 if ranking_response:
                     # Update scores from ranking response
                     score_map = {r.url: r.final_score for r in ranking_response.ranked_urls}
-                    for ranked_result in ranked_results:
+                    for ranked_result in candidates_to_rank:
                         if ranked_result.url in score_map:
                             ranked_result.ranked_score = score_map[ranked_result.url]
+                        else:
+                            # Keep original score for those not ranked (though should not happen)
+                            pass
 
+                    # Keep the rest with their original scores but lower than ranked ones
+                    # or just re-sort the whole list
+                    
                     # Re-sort by ranked score
                     ranked_results.sort(key=lambda r: r.ranked_score, reverse=True)
 

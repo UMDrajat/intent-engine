@@ -646,13 +646,19 @@ class IntentRanker:
         """
         # Step 1: Apply hard filters (constraint satisfaction)
         filtered_candidates = []
-        for candidate in request.candidates:
-            if self.constraint_satisfaction_engine.satisfies_constraints(
-                candidate, request.intent.declared.constraints
-            ):
-                filtered_candidates.append(candidate)
+        if request.intent.declared and request.intent.declared.constraints:
+            for candidate in request.candidates:
+                if self.constraint_satisfaction_engine.satisfies_constraints(
+                    candidate, request.intent.declared.constraints
+                ):
+                    filtered_candidates.append(candidate)
+        else:
+            filtered_candidates = request.candidates
 
-        # Step 2: Compute intent alignment for each candidate
+        # Step 2: Batch pre-encode contents for all candidates to improve performance
+        self._pre_encode_candidates(filtered_candidates, request.intent)
+
+        # Step 3: Compute intent alignment for each candidate
         ranked_results = []
         for candidate in filtered_candidates:
             alignment_score, match_reasons = self.intent_alignment_engine.compute_intent_alignment(
@@ -666,10 +672,40 @@ class IntentRanker:
             )
             ranked_results.append(ranked_result)
 
-        # Step 3: Sort by alignment score (descending)
+        # Step 4: Sort by alignment score (descending)
         ranked_results.sort(key=lambda x: x.alignmentScore, reverse=True)
 
         return RankingResponse(rankedResults=ranked_results)
+
+    def _pre_encode_candidates(self, candidates: list[SearchResult], intent: UniversalIntent):
+        """Pre-encode all candidate contents in a single batch for performance"""
+        if not candidates:
+            return
+
+        texts_to_encode = []
+        
+        # 1. Query-content texts
+        for c in candidates:
+            content = f"{c.title} {c.description}".strip()
+            if content:
+                texts_to_encode.append(content)
+        
+        # 2. Use case tags text
+        for c in candidates:
+            if c.tags:
+                texts_to_encode.append(" ".join(c.tags).lower())
+        
+        # 3. Intent query and use cases
+        if intent.declared.query:
+            texts_to_encode.append(intent.declared.query)
+        
+        if intent.inferred.useCases:
+            for uc in intent.inferred.useCases:
+                texts_to_encode.append(uc.value.replace("_", " "))
+
+        # Perform batch encoding (this will populate the EmbeddingService cache)
+        if texts_to_encode:
+            self.intent_alignment_engine.embedding_cache.encode_batch(texts_to_encode)
 
 
 # Global instance for caching
