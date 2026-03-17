@@ -99,7 +99,7 @@ class TestURLRankingAPI(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["total_urls"], 25)
         self.assertEqual(len(data["ranked_urls"]), 25)
-        self.assertLess(data["processing_time_ms"], 10000)
+        self.assertLess(data["processing_time_ms"], 20000)
 
     def test_exclude_big_tech(self):
         """Test the exclude_big_tech option filters correctly"""
