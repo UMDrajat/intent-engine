@@ -185,7 +185,7 @@ class Ad(Base):
     creative_format = Column(String)  # NEW: Banner, native, video, etc.
     bid_amount = Column(Float, default=0.0)  # NEW: Current bid amount
     status = Column(String, default="active", index=True)  # NEW: active, paused, disapproved
-    approval_status = Column(String, default="pending", index=True)  # NEW: pending, approved, rejected
+    approval_status = Column(String, default="pending")  # Index created via composite in __table_args__
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Relationship to advertiser
@@ -389,7 +389,7 @@ class ABTestVariant(Base):
     name = Column(String, nullable=False, index=True)  # e.g., "Control", "Variant A"
     ad_id = Column(Integer, ForeignKey("ads.id"), index=True)  # The ad to show for this variant
     traffic_weight = Column(Float, default=0.5)  # Weight for traffic splitting
-    is_control = Column(Boolean, default=False, index=True)  # Is this the control variant
+    is_control = Column(Boolean, default=False)  # Index created via composite in __table_args__
     impressions = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
     conversions = Column(Integer, default=0)
@@ -416,7 +416,7 @@ class ABTestAssignment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     test_id = Column(Integer, ForeignKey("ab_tests.id"), nullable=False, index=True)
-    variant_id = Column(Integer, ForeignKey("ab_test_variants.id"), nullable=False, index=True)
+    variant_id = Column(Integer, ForeignKey("ab_test_variants.id"), nullable=False)  # Index created via composite in __table_args__
     user_hash = Column(String, nullable=False, index=True)  # Hashed user/session identifier
     assigned_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
@@ -465,7 +465,7 @@ class DatabaseManager:
         # Also schedule shutdown handler
         import atexit
 
-        atexit.register(lambda: self.scheduler.shutdown())
+        atexit.register(lambda: self.scheduler.shutdown() if self.scheduler.running else None)
 
     def get_db(self):
         """
