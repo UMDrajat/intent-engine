@@ -10,6 +10,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Optional
+from sentence_transformers import CrossEncoder
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -306,6 +307,7 @@ service_recommendation_requests = Counter(
 )
 url_ranking_requests = Counter("url_ranking_requests_total", "Number of URL ranking requests")
 unified_search_requests = Counter("unified_search_requests_total", "Number of unified search requests")
+rerank_requests = Counter("rerank_requests_total", "Number of semantic re-ranking requests")
 
 
 # Rate limiting configuration
@@ -352,6 +354,61 @@ app = FastAPI(
 # Create versioned API routers
 # v1 router for all production endpoints
 v1_router = APIRouter(prefix="/v1", tags=["v1"])
+
+# Global Cross-Encoder model for re-ranking
+cross_encoder_model = None
+
+
+def get_cross_encoder():
+    """Lazy initialization of Cross-Encoder model"""
+    global cross_encoder_model
+    if cross_encoder_model is None:
+        logger.info("Loading Cross-Encoder model: ms-marco-MiniLM-L-6-v2...")
+        try:
+            # Using a fast, high-quality re-ranker model
+            cross_encoder_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+            logger.info("Cross-Encoder model loaded successfully")
+        except Exception as e:
+            logger.error(f"Failed to load Cross-Encoder: {e}")
+            return None
+    return cross_encoder_model
+
+
+@v1_router.post("/rerank")
+async def rerank_endpoint(request: dict[str, Any]):
+    """
+    Semantic re-ranking of search results using a Cross-Encoder.
+    Expected request: {"query": "...", "documents": [{"id": "...", "text": "..."}]}
+    """
+    rerank_requests.inc()
+    
+    query = request.get("query")
+    documents = request.get("documents", [])
+    
+    if not query or not documents:
+        raise HTTPException(status_code=400, detail="Missing 'query' or 'documents'")
+    
+    model = get_cross_encoder()
+    if not model:
+        raise HTTPException(status_code=503, detail="Re-ranking model not available")
+    
+    # Prepare pairs for re-ranking
+    pairs = [[query, doc.get("text", "")] for doc in documents]
+    
+    # Generate scores
+    scores = model.predict(pairs)
+    
+    # Attach scores to documents
+    results = []
+    for i, doc in enumerate(documents):
+        doc_copy = dict(doc)
+        doc_copy["rerank_score"] = float(scores[i])
+        results.append(doc_copy)
+    
+    # Sort by score descending
+    results.sort(key=lambda x: x["rerank_score"], reverse=True)
+    
+    return {"results": results}
 
 
 # Configure CORS from environment variables

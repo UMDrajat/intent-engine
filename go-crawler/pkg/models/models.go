@@ -9,7 +9,9 @@ type CrawledPage struct {
 	FinalURL        string    `json:"final_url"`
 	Title           string    `json:"title"`
 	Content         string    `json:"content"`
-	HTMLContent     string    `json:"-"` // Raw HTML, not serialized to JSON
+	HTMLContent     string    `json:"-"`            // Raw HTML, not serialized to JSON
+	ContentHash     string    `json:"content_hash"` // SHA-256 of raw HTML for CAS
+	SimHash         uint64    `json:"simhash"`      // SimHash for near-duplicate detection
 	MetaDescription string    `json:"meta_description"`
 	MetaKeywords    string    `json:"meta_keywords"`
 	StatusCode      int       `json:"status_code"`
@@ -45,6 +47,7 @@ type SearchDocument struct {
 	URL             string         `json:"url"`
 	Title           string         `json:"title"`
 	Content         string         `json:"content"`
+	SimHash         uint64         `json:"simhash"` // For near-duplicate filtering in results
 	MetaDescription string         `json:"meta_description"`
 	TermFrequencies map[string]int `json:"term_frequencies"`
 	WordCount       int            `json:"word_count"`

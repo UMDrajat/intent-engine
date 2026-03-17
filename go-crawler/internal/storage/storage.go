@@ -1,9 +1,12 @@
 package storage
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"strings"
 	"time"
@@ -12,6 +15,50 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/itxLikhith/intent-engine/go-crawler/pkg/models"
 )
+
+// SimHash generates a 64-bit SimHash for a string (simple implementation)
+func SimHash(text string) uint64 {
+	// Simple bit-weighting simhash implementation
+	v := make([]int, 64)
+	words := strings.Fields(strings.ToLower(text))
+	
+	if len(words) == 0 {
+		return 0
+	}
+
+	for _, word := range words {
+		h := fnv.New64a()
+		h.Write([]byte(word))
+		hash := h.Sum64()
+		
+		for i := 0; i < 64; i++ {
+			if (hash >> i & 1) == 1 {
+				v[i]++
+			} else {
+				v[i]--
+			}
+		}
+	}
+	
+	var fingerprint uint64
+	for i := 0; i < 64; i++ {
+		if v[i] > 0 {
+			fingerprint |= 1 << i
+		}
+	}
+	return fingerprint
+}
+
+// HammingDistance calculates the number of bits that differ between two uint64s
+func HammingDistance(a, b uint64) int {
+	x := a ^ b
+	dist := 0
+	for x > 0 {
+		dist++
+		x &= x - 1
+	}
+	return dist
+}
 
 // Storage manages both PostgreSQL and BadgerDB
 type Storage struct {
@@ -30,6 +77,12 @@ type StorageConfig struct {
 func NewStorage(config *StorageConfig) (*Storage, error) {
 	// Open BadgerDB (always enabled for optimal performance)
 	opts := badger.DefaultOptions(config.BadgerPath)
+	
+	// Enable compression (Zstandard is default in v4 if Cgo is enabled, but let's be explicit)
+	// v4 defaults to Snappy if Cgo is disabled, which is still good.
+	// We'll also set a reasonable compression level if using Zstd.
+	opts.IndexCacheSize = 128 << 20 // 128MB cache for index
+	
 	if config.ReadOnly {
 		opts.ReadOnly = true
 		opts.BypassLockGuard = true
@@ -38,7 +91,7 @@ func NewStorage(config *StorageConfig) (*Storage, error) {
 
 	var badgerDB *badger.DB
 	var err error
-	// Try to open BadgerDB with retries for lock acquisition (important for Windows/WSL2 or rapid restarts)
+	// Try to open BadgerDB with retries for lock acquisition
 	maxRetries := 5
 	if config.ReadOnly {
 		maxRetries = 2 // Fewer retries for read-only
@@ -47,27 +100,39 @@ func NewStorage(config *StorageConfig) (*Storage, error) {
 	for i := 0; i < maxRetries; i++ {
 		badgerDB, err = badger.Open(opts)
 		if err == nil {
-			log.Println("Opened BadgerDB")
+			log.Println("Opened BadgerDB with compression enabled")
 			break
 		}
 
-		// If it's a lock error and we have retries left, wait and try again
 		if strings.Contains(err.Error(), "Cannot acquire directory lock") && i < maxRetries-1 {
 			log.Printf("Warning: BadgerDB lock busy, retrying in 1s (%d/%d)...", i+1, maxRetries)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		// Other errors or out of retries
 		if config.ReadOnly {
-			// In read-only mode, BadgerDB might not exist yet - this is okay
 			log.Printf("Warning: BadgerDB not available in read-only mode: %v", err)
 			log.Println("Continuing without BadgerDB (HTML content will not be available)")
-			err = nil // Don't return error
+			err = nil 
 			break
 		} else {
 			return nil, fmt.Errorf("failed to open BadgerDB: %w", err)
 		}
+	}
+
+	// Start BadgerDB Garbage Collection in background
+	if badgerDB != nil && !config.ReadOnly {
+		go func() {
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+			again:
+				err := badgerDB.RunValueLogGC(0.5) // Reclaim if >50% is stale
+				if err == nil {
+					goto again
+				}
+			}
+		}()
 	}
 
 	// Connect to PostgreSQL
@@ -88,11 +153,11 @@ func NewStorage(config *StorageConfig) (*Storage, error) {
 	}
 
 	// Set connection pool settings
-	postgres.SetMaxOpenConns(25)
-	postgres.SetMaxIdleConns(5)
+	postgres.SetMaxOpenConns(50) // Increased for better concurrency
+	postgres.SetMaxIdleConns(10)
 	postgres.SetConnMaxLifetime(5 * time.Minute)
 
-	log.Println("Connected to PostgreSQL")
+	log.Println("Connected to PostgreSQL (pool size: 50)")
 
 	return &Storage{
 		postgres: postgres,
@@ -105,7 +170,9 @@ func (s *Storage) Close() error {
 	var errs []string
 
 	if s.badger != nil {
-		log.Println("Closing BadgerDB...")
+		log.Println("Closing BadgerDB and running final GC...")
+		// Final GC attempt before close
+		s.badger.RunValueLogGC(0.5)
 		if err := s.badger.Close(); err != nil {
 			errs = append(errs, fmt.Sprintf("badger close error: %v", err))
 		}
@@ -125,8 +192,16 @@ func (s *Storage) Close() error {
 	return nil
 }
 
-// SavePage saves a crawled page to both PostgreSQL and BadgerDB
+// SavePage saves a crawled page to both PostgreSQL and BadgerDB using CAS
 func (s *Storage) SavePage(page *models.CrawledPage) error {
+	// 1. Calculate Content Hash for CAS
+	hasher := sha256.New()
+	hasher.Write([]byte(page.HTMLContent))
+	page.ContentHash = hex.EncodeToString(hasher.Sum(nil))
+	
+	// 2. Calculate SimHash for near-duplicate detection
+	page.SimHash = SimHash(page.Content)
+
 	// Start PostgreSQL transaction
 	tx, err := s.postgres.Begin()
 	if err != nil {
@@ -134,16 +209,17 @@ func (s *Storage) SavePage(page *models.CrawledPage) error {
 	}
 	defer tx.Rollback()
 
-	// Insert or update page in PostgreSQL (using ON CONFLICT for upsert)
+	// Insert or update page in PostgreSQL
+	// Added content_hash and simhash for deduplication
 	query := `
 		INSERT INTO crawled_pages (
 			url, final_url, title, content, meta_description, meta_keywords,
 			status_code, content_type, content_length, load_time_ms,
 			crawl_depth, outbound_links, inbound_links,
 			language, is_indexed, crawled_at, updated_at, next_crawl_at,
-			html_content
+			content_hash, simhash
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
 		)
 		ON CONFLICT (url) DO UPDATE SET
 			final_url = EXCLUDED.final_url,
@@ -158,7 +234,8 @@ func (s *Storage) SavePage(page *models.CrawledPage) error {
 			crawl_depth = EXCLUDED.crawl_depth,
 			outbound_links = EXCLUDED.outbound_links,
 			updated_at = EXCLUDED.updated_at,
-			html_content = EXCLUDED.html_content
+			content_hash = EXCLUDED.content_hash,
+			simhash = EXCLUDED.simhash
 		RETURNING id
 	`
 
@@ -169,7 +246,7 @@ func (s *Storage) SavePage(page *models.CrawledPage) error {
 		page.ContentType, page.ContentLength, page.LoadTimeMs,
 		page.CrawlDepth, page.OutboundLinks, page.InboundLinks,
 		page.Language, page.IsIndexed, page.CrawledAt, page.UpdatedAt, page.NextCrawlAt,
-		page.HTMLContent,
+		page.ContentHash, fmt.Sprintf("%d", page.SimHash),
 	).Scan(&pageID)
 	if err != nil {
 		return fmt.Errorf("failed to insert/update page: %w", err)
@@ -178,14 +255,32 @@ func (s *Storage) SavePage(page *models.CrawledPage) error {
 	// Set the ID on the page object
 	page.ID = fmt.Sprintf("page_%d", pageID)
 
-	// Store raw HTML in BadgerDB (if available)
+	// CAS (Content-Addressable Storage): Store raw HTML in BadgerDB indexed by its HASH
+	// This ensures multiple URLs with identical content only store one copy of the HTML.
 	if page.HTMLContent != "" && s.badger != nil {
 		err = s.badger.Update(func(txn *badger.Txn) error {
-			key := []byte("html:" + page.ID)
-			return txn.Set(key, []byte(page.HTMLContent))
+			// Key is content:HASH
+			key := []byte("content:" + page.ContentHash)
+			
+			// Check if we already have this content
+			_, err := txn.Get(key)
+			if err == badger.ErrKeyNotFound {
+				// Only store if it doesn't exist
+				return txn.Set(key, []byte(page.HTMLContent))
+			}
+			return err
 		})
 		if err != nil {
-			return fmt.Errorf("failed to store HTML in BadgerDB: %w", err)
+			return fmt.Errorf("failed to store HTML in BadgerDB (CAS): %w", err)
+		}
+		
+		// Map page ID to content hash for retrieval
+		err = s.badger.Update(func(txn *badger.Txn) error {
+			key := []byte("page_to_content:" + page.ID)
+			return txn.Set(key, []byte(page.ContentHash))
+		})
+		if err != nil {
+			return fmt.Errorf("failed to store mapping in BadgerDB: %w", err)
 		}
 	}
 
@@ -263,25 +358,31 @@ func (s *Storage) GetPage(id string) (*models.CrawledPage, error) {
 		SELECT id, url, final_url, title, content, meta_description, meta_keywords,
 		       status_code, content_type, content_length, load_time_ms,
 		       crawl_depth, outbound_links, inbound_links, pagerank,
-		       language, is_indexed, crawled_at, updated_at, next_crawl_at
+		       language, is_indexed, crawled_at, updated_at, next_crawl_at,
+		       content_hash, simhash
 		FROM crawled_pages
 		WHERE url = $1
 	`
 
 	page = &models.CrawledPage{}
 	var pageRank sql.NullFloat64
+	var simHashStr sql.NullString
 	err = s.postgres.QueryRow(query, id).Scan(
 		&page.ID, &page.URL, &page.FinalURL, &page.Title, &page.Content,
 		&page.MetaDescription, &page.MetaKeywords, &page.StatusCode,
 		&page.ContentType, &page.ContentLength, &page.LoadTimeMs,
 		&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &pageRank,
 		&page.Language, &page.IsIndexed, &page.CrawledAt, &page.UpdatedAt, &page.NextCrawlAt,
+		&page.ContentHash, &simHashStr,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query page: %w", err)
 	}
 
 	page.PageRank = pageRank.Float64
+	if simHashStr.Valid {
+		fmt.Sscanf(simHashStr.String, "%d", &page.SimHash)
+	}
 
 	// Convert integer ID to string format
 	page.ID = fmt.Sprintf("page_%d", page.ID)
@@ -295,25 +396,31 @@ func (s *Storage) GetPageByIntID(intID string) (*models.CrawledPage, error) {
 		SELECT id, url, final_url, title, content, meta_description, meta_keywords,
 		       status_code, content_type, content_length, load_time_ms,
 		       crawl_depth, outbound_links, inbound_links, pagerank,
-		       language, is_indexed, crawled_at, updated_at, next_crawl_at
+		       language, is_indexed, crawled_at, updated_at, next_crawl_at,
+		       content_hash, simhash
 		FROM crawled_pages
 		WHERE id = $1
 	`
 
 	page := &models.CrawledPage{}
 	var pageRank sql.NullFloat64
+	var simHashStr sql.NullString
 	err := s.postgres.QueryRow(query, intID).Scan(
 		&page.ID, &page.URL, &page.FinalURL, &page.Title, &page.Content,
 		&page.MetaDescription, &page.MetaKeywords, &page.StatusCode,
 		&page.ContentType, &page.ContentLength, &page.LoadTimeMs,
 		&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &pageRank,
 		&page.Language, &page.IsIndexed, &page.CrawledAt, &page.UpdatedAt, &page.NextCrawlAt,
+		&page.ContentHash, &simHashStr,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query page: %w", err)
 	}
 
 	page.PageRank = pageRank.Float64
+	if simHashStr.Valid {
+		fmt.Sscanf(simHashStr.String, "%d", &page.SimHash)
+	}
 
 	// Convert integer ID to string format
 	page.ID = fmt.Sprintf("page_%d", page.ID)
@@ -321,11 +428,33 @@ func (s *Storage) GetPageByIntID(intID string) (*models.CrawledPage, error) {
 	return page, nil
 }
 
-// GetPageHTML retrieves raw HTML from BadgerDB
+// GetPageHTML retrieves raw HTML using the CAS mapping
 func (s *Storage) GetPageHTML(id string) (string, error) {
-	var html string
+	if s.badger == nil {
+		return "", fmt.Errorf("BadgerDB not available")
+	}
+
+	var contentHash string
+	// 1. Get content hash for the page ID
 	err := s.badger.View(func(txn *badger.Txn) error {
-		key := []byte("html:" + id)
+		key := []byte("page_to_content:" + id)
+		item, err := txn.Get(key)
+		if err != nil {
+			return err
+		}
+		return item.Value(func(val []byte) error {
+			contentHash = string(val)
+			return nil
+		})
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get content hash for page %s: %w", id, err)
+	}
+
+	// 2. Get content using the hash
+	var html string
+	err = s.badger.View(func(txn *badger.Txn) error {
+		key := []byte("content:" + contentHash)
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
@@ -336,8 +465,9 @@ func (s *Storage) GetPageHTML(id string) (string, error) {
 		})
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to get HTML from BadgerDB: %w", err)
+		return "", fmt.Errorf("failed to get content for hash %s: %w", contentHash, err)
 	}
+
 	return html, nil
 }
 
@@ -391,7 +521,8 @@ func (s *Storage) GetUnindexedPages(limit int) ([]*models.CrawledPage, error) {
 		SELECT id, url, final_url, title, content, meta_description, meta_keywords,
 		       status_code, content_type, content_length, load_time_ms,
 		       crawl_depth, outbound_links, inbound_links, pagerank,
-		       language, is_indexed, crawled_at, updated_at, next_crawl_at
+		       language, is_indexed, crawled_at, updated_at, next_crawl_at,
+		       content_hash, simhash
 		FROM crawled_pages
 		WHERE is_indexed = false
 		ORDER BY crawled_at ASC
@@ -408,17 +539,22 @@ func (s *Storage) GetUnindexedPages(limit int) ([]*models.CrawledPage, error) {
 	for rows.Next() {
 		page := &models.CrawledPage{}
 		var pageRank sql.NullFloat64
+		var simHashStr sql.NullString
 		err := rows.Scan(
 			&page.ID, &page.URL, &page.FinalURL, &page.Title, &page.Content,
 			&page.MetaDescription, &page.MetaKeywords, &page.StatusCode,
 			&page.ContentType, &page.ContentLength, &page.LoadTimeMs,
 			&page.CrawlDepth, &page.OutboundLinks, &page.InboundLinks, &pageRank,
 			&page.Language, &page.IsIndexed, &page.CrawledAt, &page.UpdatedAt, &page.NextCrawlAt,
+			&page.ContentHash, &simHashStr,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan page: %w", err)
 		}
 		page.PageRank = pageRank.Float64
+		if simHashStr.Valid {
+			fmt.Sscanf(simHashStr.String, "%d", &page.SimHash)
+		}
 		pages = append(pages, page)
 	}
 

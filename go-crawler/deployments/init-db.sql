@@ -22,8 +22,11 @@ CREATE TABLE IF NOT EXISTS crawled_pages (
     is_indexed BOOLEAN DEFAULT false,
     crawled_at TIMESTAMP,
     updated_at TIMESTAMP,
-    next_crawl_at TIMESTAMP
+    next_crawl_at TIMESTAMP,
+    content_hash VARCHAR,
+    simhash VARCHAR
 );
+
 
 -- Create page_links table
 CREATE TABLE IF NOT EXISTS page_links (

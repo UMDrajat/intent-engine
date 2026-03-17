@@ -54,19 +54,36 @@ func NewSearchIndexer(blevePath string, store *storage.Storage) (*SearchIndexer,
 func NewSearchIndexerWithOptions(blevePath string, store *storage.Storage, readOnly bool) (*SearchIndexer, error) {
 	// Create index mapping with intent fields
 	mapping := bleve.NewIndexMapping()
+	
+	// Create a text field mapping that doesn't include the full content in the "_all" field
+	// This significantly reduces the size of the index.
+	textFieldMapping := bleve.NewTextFieldMapping()
+	textFieldMapping.Store = true
+	textFieldMapping.Index = true
+	textFieldMapping.IncludeInAll = false // Don't duplicate in _all field
+	textFieldMapping.Analyzer = "en"      // Use English analyzer to remove stop words
 
 	// Add fields for intent-aware search
-	mapping.DefaultMapping.AddFieldMappingsAt("title", bleve.NewTextFieldMapping())
-	mapping.DefaultMapping.AddFieldMappingsAt("content", bleve.NewTextFieldMapping())
-	mapping.DefaultMapping.AddFieldMappingsAt("meta_description", bleve.NewTextFieldMapping())
-	mapping.DefaultMapping.AddFieldMappingsAt("url", bleve.NewTextFieldMapping())
+	mapping.DefaultMapping.AddFieldMappingsAt("title", textFieldMapping)
+	mapping.DefaultMapping.AddFieldMappingsAt("content", textFieldMapping)
+	mapping.DefaultMapping.AddFieldMappingsAt("meta_description", textFieldMapping)
+	
+	// URL doesn't need the English analyzer
+	urlFieldMapping := bleve.NewTextFieldMapping()
+	urlFieldMapping.IncludeInAll = false
+	urlFieldMapping.Store = true
+	mapping.DefaultMapping.AddFieldMappingsAt("url", urlFieldMapping)
 
-	// Add intent-specific fields
-	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.primary_goal", bleve.NewTextFieldMapping())
-	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.topics", bleve.NewTextFieldMapping())
-	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.use_cases", bleve.NewTextFieldMapping())
-	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.complexity", bleve.NewTextFieldMapping())
-	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.result_type", bleve.NewTextFieldMapping())
+	// Add intent-specific fields (don't store these if only used for filtering)
+	keywordFieldMapping := bleve.NewTextFieldMapping()
+	keywordFieldMapping.IncludeInAll = false
+	keywordFieldMapping.Store = false // Just for searching/filtering
+	
+	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.primary_goal", keywordFieldMapping)
+	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.topics", keywordFieldMapping)
+	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.use_cases", keywordFieldMapping)
+	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.complexity", keywordFieldMapping)
+	mapping.DefaultMapping.AddFieldMappingsAt("intent_metadata.result_type", keywordFieldMapping)
 
 	var index bleve.Index
 	var err error

@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS crawled_pages (
     is_indexed BOOLEAN DEFAULT FALSE,
     crawled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    next_crawl_at TIMESTAMP WITH TIME ZONE
+    next_crawl_at TIMESTAMP WITH TIME ZONE,
+    content_hash VARCHAR(64),
+    simhash VARCHAR(20)
 );
 
 -- Create indexes for efficient querying
@@ -34,6 +36,9 @@ CREATE INDEX IF NOT EXISTS idx_crawled_pages_title ON crawled_pages(title);
 CREATE INDEX IF NOT EXISTS idx_crawled_pages_crawled_at ON crawled_pages(crawled_at);
 CREATE INDEX IF NOT EXISTS idx_crawled_pages_is_indexed ON crawled_pages(is_indexed);
 CREATE INDEX IF NOT EXISTS idx_crawled_pages_pagerank ON crawled_pages(pagerank);
+CREATE INDEX IF NOT EXISTS idx_crawled_pages_content_hash ON crawled_pages(content_hash);
+CREATE INDEX IF NOT EXISTS idx_crawled_pages_simhash ON crawled_pages(simhash);
+
 
 -- Page links table (for PageRank calculation)
 CREATE TABLE IF NOT EXISTS page_links (

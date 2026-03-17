@@ -102,6 +102,8 @@ type UnifiedSearchResult struct {
 	AlignmentScore  *intent.IntentAlignmentScore     `json:"alignment_score,omitempty"`
 	MatchReasons    []string                      `json:"match_reasons,omitempty"`
 	VectorScore     float64                       `json:"vector_score,omitempty"`
+	SimHash         string                        `json:"simhash,omitempty"`
+	RerankScore     float64                       `json:"rerank_score,omitempty"`
 }
 
 // UnifiedSearchResponse represents a unified search response
@@ -767,6 +769,7 @@ func addURLsToQueue(urls []string) int {
 func combineResults(goResults, searxngResults, vectorResults []UnifiedSearchResult, queryIntent *intent.DeclaredIntent) []UnifiedSearchResult {
 	allResults := append(append(goResults, searxngResults...), vectorResults...)
 
+	// Step 1: Initial scoring adjustment based on intent alignment
 	for i := range allResults {
 		if allResults[i].AlignmentScore != nil {
 			allResults[i].Score *= (0.5 + 0.5*allResults[i].AlignmentScore.TotalScore)
@@ -776,20 +779,147 @@ func combineResults(goResults, searxngResults, vectorResults []UnifiedSearchResu
 		}
 	}
 
-	for i := 0; i < len(allResults)-1; i++ {
-		for j := 0; j < len(allResults)-i-1; j++ {
-			if allResults[j].Score < allResults[j+1].Score {
-				allResults[j], allResults[j+1] = allResults[j+1], allResults[j]
+	// Step 2: Basic sort
+	sortResults(allResults)
+
+	// Step 3: Advanced Deduplication (SimHash)
+	// Remove near-duplicates to ensure result diversity
+	uniqueResults := make([]UnifiedSearchResult, 0, len(allResults))
+	seenSimhashes := make([]uint64, 0)
+	
+	for _, res := range allResults {
+		// Generate SimHash for the result content if not already present
+		var currentSimhash uint64
+		if res.SimHash != "" {
+			fmt.Sscanf(res.SimHash, "%d", &currentSimhash)
+		} else {
+			currentSimhash = storage.SimHash(res.Content)
+		}
+		
+		isDuplicate := false
+		for _, seen := range seenSimhashes {
+			// Using Hamming Distance threshold of 3 for near-duplicates
+			if storage.HammingDistance(currentSimhash, seen) <= 3 {
+				isDuplicate = true
+				break
 			}
+		}
+		
+		if !isDuplicate {
+			uniqueResults = append(uniqueResults, res)
+			seenSimhashes = append(seenSimhashes, currentSimhash)
 		}
 	}
 
-	for i := range allResults {
-		allResults[i].Rank = i + 1
+	// Step 4: Semantic Re-ranking (Cross-Encoders)
+	// Send top 20 unique results to Python API for deep-semantic re-ranking
+	topCount := 20
+	if len(uniqueResults) < topCount {
+		topCount = len(uniqueResults)
+	}
+	
+	if topCount > 0 {
+		reranked := rerankWithPythonAPI(queryIntent.Query, uniqueResults[:topCount])
+		if len(reranked) > 0 {
+			// Replace top results with reranked versions
+			copy(uniqueResults, reranked)
+			// Re-sort to incorporate rerank scores for the top results
+			// (already sorted by rerankWithPythonAPI, but for clarity)
+		}
 	}
 
-	return allResults
+	// Assign final ranks
+	for i := range uniqueResults {
+		uniqueResults[i].Rank = i + 1
+	}
+
+	return uniqueResults
 }
+
+func sortResults(results []UnifiedSearchResult) {
+	for i := 0; i < len(results)-1; i++ {
+		for j := 0; j < len(results)-i-1; j++ {
+			if results[j].Score < results[j+1].Score {
+				results[j], results[j+1] = results[j+1], results[j]
+			}
+		}
+	}
+}
+
+func rerankWithPythonAPI(query string, results []UnifiedSearchResult) []UnifiedSearchResult {
+	apiURL := os.Getenv("INTENT_ENGINE_API_URL")
+	if apiURL == "" {
+		apiURL = "http://intent-engine-api:8000"
+	}
+
+	// Prepare request
+	type Doc struct {
+		ID   string `json:"id"`
+		Text string `json:"text"`
+	}
+	var docs []Doc
+	for _, res := range results {
+		docs = append(docs, Doc{
+			ID:   res.URL,
+			Text: res.Title + " " + res.Content,
+		})
+	}
+
+	reqBody, _ := json.Marshal(map[string]interface{}{
+		"query":     query,
+		"documents": docs,
+	})
+
+	// Call rerank endpoint
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(
+		fmt.Sprintf("%s/v1/rerank", apiURL),
+		"application/json",
+		strings.NewReader(string(reqBody)),
+	)
+	if err != nil {
+		log.Printf("Warning: Re-ranking failed: %v", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Warning: Re-ranking API returned status %d", resp.StatusCode)
+		return nil
+	}
+
+	var apiResp struct {
+		Results []struct {
+			ID          string  `json:"id"`
+			RerankScore float64 `json:"rerank_score"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return nil
+	}
+
+	// Map scores back to results
+	scoreMap := make(map[string]float64)
+	for _, r := range apiResp.Results {
+		scoreMap[r.ID] = r.RerankScore
+	}
+
+	rerankedResults := make([]UnifiedSearchResult, len(results))
+	copy(rerankedResults, results)
+
+	for i := range rerankedResults {
+		if score, ok := scoreMap[rerankedResults[i].URL]; ok {
+			rerankedResults[i].RerankScore = score
+			// Blend rerank score into final score (boost reranked ones)
+			rerankedResults[i].Score = (rerankedResults[i].Score * 0.3) + (score * 0.7)
+		}
+	}
+
+	// Final sort by boosted score
+	sortResults(rerankedResults)
+	return rerankedResults
+}
+
 
 func extractTopicsFromResults(results []UnifiedSearchResult) []string {
 	topicMap := make(map[string]int)

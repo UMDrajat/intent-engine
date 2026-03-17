@@ -2,14 +2,15 @@ package crawler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/go-redis/redis/v8"
 	"github.com/gocolly/colly/v2"
 	"github.com/itxLikhith/intent-engine/go-crawler/internal/frontier"
 	"github.com/itxLikhith/intent-engine/go-crawler/internal/storage"
@@ -18,14 +19,15 @@ import (
 
 // Crawler represents the web crawler
 type Crawler struct {
-	collector  *colly.Collector
-	config     *Config
-	store      *storage.Storage
-	frontier   *frontier.URLFrontier
-	stats      *CrawlStats
-	statsMutex sync.RWMutex
-	ctx        context.Context
-	cancel     context.CancelFunc
+	collector   *colly.Collector
+	config      *Config
+	store       *storage.Storage
+	frontier    *frontier.URLFrontier
+	redisClient *redis.Client
+	stats       *CrawlStats
+	statsMutex  sync.RWMutex
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 // CrawlStats holds crawling statistics
@@ -46,6 +48,11 @@ func NewCrawler(cfg *Config, store *storage.Storage, redisAddr string) (*Crawler
 	if err != nil {
 		return nil, fmt.Errorf("failed to create frontier: %w", err)
 	}
+
+	// Initialize Redis client for dynamic content check
+	rClient := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+	})
 
 	// Create Colly collector
 	c := colly.NewCollector(
@@ -69,10 +76,11 @@ func NewCrawler(cfg *Config, store *storage.Storage, redisAddr string) (*Crawler
 	ctx, cancel := context.WithCancel(context.Background())
 
 	crawler := &Crawler{
-		collector: c,
-		config:    cfg,
-		store:     store,
-		frontier:  f,
+		collector:   c,
+		config:      cfg,
+		store:       store,
+		frontier:    f,
+		redisClient: rClient,
 		stats: &CrawlStats{
 			StartTime: time.Now(),
 		},
@@ -90,7 +98,15 @@ func NewCrawler(cfg *Config, store *storage.Storage, redisAddr string) (*Crawler
 func (c *Crawler) setupCallbacks() {
 	// Before request
 	c.collector.OnRequest(func(r *colly.Request) {
-		log.Printf("Visiting: %s", r.URL.String())
+		// Ensure URL is normalized
+		normalized := frontier.NormalizeURL(r.URL.String())
+		if r.URL.String() != normalized {
+			// This shouldn't happen if we normalize before adding to queue, 
+			// but good for safety.
+			log.Printf("Visiting (normalized): %s", normalized)
+		} else {
+			log.Printf("Visiting: %s", r.URL.String())
+		}
 	})
 
 	// On response
@@ -99,10 +115,15 @@ func (c *Crawler) setupCallbacks() {
 		c.stats.PagesCrawled++
 		c.statsMutex.Unlock()
 
-		// Parse HTML
+		// Parse HTML only if it's text/html
+		contentType := r.Headers.Get("Content-Type")
+		if !strings.Contains(strings.ToLower(contentType), "text/html") {
+			return
+		}
+
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(r.Body)))
 		if err != nil {
-			log.Printf("Failed to parse HTML: %v", err)
+			log.Printf("Failed to parse HTML from %s: %v", r.Request.URL, err)
 			return
 		}
 
@@ -111,8 +132,13 @@ func (c *Crawler) setupCallbacks() {
 
 		// Store page
 		if err := c.store.SavePage(page); err != nil {
-			log.Printf("Failed to save page: %v", err)
+			log.Printf("Failed to save page %s: %v", r.Request.URL, err)
 			return
+		}
+
+		// Mark as completed in frontier (using normalization internally)
+		if err := c.frontier.MarkCompleted(r.Request.URL.String()); err != nil {
+			log.Printf("Failed to mark %s as completed: %v", r.Request.URL, err)
 		}
 
 		c.statsMutex.Lock()
@@ -128,43 +154,95 @@ func (c *Crawler) setupCallbacks() {
 		c.statsMutex.Lock()
 		c.stats.PagesFailed++
 		c.statsMutex.Unlock()
-		log.Printf("Error crawling %s: %v", r.Request.URL, err)
-	})
-
-	// On link discovered
-	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		// Links are handled in extractLinks
+		
+		urlStr := ""
+		if r != nil && r.Request != nil {
+			urlStr = r.Request.URL.String()
+			// Mark as failed to avoid retry loops
+			if markErr := c.frontier.MarkFailed(urlStr, err.Error()); markErr != nil {
+				log.Printf("Failed to mark URL as failed: %v", markErr)
+			}
+		}
+		log.Printf("Error crawling %s: %v", urlStr, err)
 	})
 }
 
 // extractPageData extracts page information from response
 func (c *Crawler) extractPageData(r *colly.Response, doc *goquery.Document) *models.CrawledPage {
+	urlStr := r.Request.URL.String()
+	
+	// Default data from static HTML
 	title := doc.Find("title").First().Text()
-	description := ""
-	doc.Find("meta[name=description]").Each(func(i int, s *goquery.Selection) {
-		description, _ = s.Attr("content")
-	})
-
-	content := doc.Find("body").Text()
-	content = strings.TrimSpace(strings.ReplaceAll(content, "\n", " "))
-
-	// Limit content length
-	if len(content) > 50000 {
-		content = content[:50000]
+	if title == "" {
+		title = doc.Find("h1").First().Text()
 	}
 
-	htmlContent := string(r.Body)
+	description := ""
+	doc.Find("meta[name=description], meta[property=\"og:description\"]").Each(func(i int, s *goquery.Selection) {
+		if content, exists := s.Attr("content"); exists && description == "" {
+			description = content
+		}
+	})
+
+	// Improved content extraction: focus on main content if possible
+	var contentBuilder strings.Builder
+	doc.Find("main, article, #content, .content, .main").Each(func(i int, s *goquery.Selection) {
+		contentBuilder.WriteString(s.Text())
+		contentBuilder.WriteString(" ")
+	})
+	
+	content := contentBuilder.String()
+	if len(content) < 100 {
+		// Fallback to body text
+		content = doc.Find("body").Text()
+	}
+
+	// Dynamic Content check (Version 3.0.0 feature)
+	// If this URL was recently processed by the Playwright worker, use its richer data
+	if c.redisClient != nil {
+		ctx := context.Background()
+		dynamicKey := "dynamic_scrape:" + urlStr
+		data, err := c.redisClient.Get(ctx, dynamicKey).Result()
+		if err == nil {
+			var dynamicData struct {
+				Title       string `json:"title"`
+				Description string `json:"description"`
+				Content     string `json:"content"`
+				HTML        string `json:"html"`
+			}
+			if err := json.Unmarshal([]byte(data), &dynamicData); err == nil {
+				log.Printf("Using dynamic JS content for: %s", urlStr)
+				if dynamicData.Title != "" {
+					title = dynamicData.Title
+				}
+				if dynamicData.Description != "" {
+					description = dynamicData.Description
+				}
+				if len(dynamicData.Content) > len(content) {
+					content = dynamicData.Content
+				}
+			}
+		}
+	}
+
+	// Clean up content
+	content = strings.Join(strings.Fields(content), " ")
+
+	// Limit content length
+	if len(content) > 100000 {
+		content = content[:100000]
+	}
 
 	return &models.CrawledPage{
-		URL:             r.Request.URL.String(),
-		FinalURL:        r.Request.URL.String(),
-		Title:           title,
+		URL:             urlStr,
+		FinalURL:        urlStr,
+		Title:           strings.TrimSpace(title),
 		Content:         content,
-		MetaDescription: description,
+		MetaDescription: strings.TrimSpace(description),
 		StatusCode:      r.StatusCode,
 		ContentType:     r.Headers.Get("Content-Type"),
 		ContentLength:   len(r.Body),
-		HTMLContent:     htmlContent,
+		HTMLContent:     string(r.Body),
 		CrawledAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 		IsIndexed:       false,
@@ -176,6 +254,7 @@ func (c *Crawler) extractPageData(r *colly.Response, doc *goquery.Document) *mod
 func (c *Crawler) extractLinks(r *colly.Response, doc *goquery.Document) {
 	linksFound := 0
 	var linksToSave []*models.PageLink
+	uniqueLinks := make(map[string]struct{})
 
 	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
 		href, exists := s.Attr("href")
@@ -183,15 +262,21 @@ func (c *Crawler) extractLinks(r *colly.Response, doc *goquery.Document) {
 			return
 		}
 
-		// Resolve relative URLs
-		baseURL, _ := url.Parse(r.Request.URL.String())
+		// Resolve and normalize URL
+		baseURL := r.Request.URL
 		linkURL, err := baseURL.Parse(href)
 		if err != nil {
 			return
 		}
+		
+		normalized := frontier.NormalizeURL(linkURL.String())
+		if _, seen := uniqueLinks[normalized]; seen {
+			return
+		}
+		uniqueLinks[normalized] = struct{}{}
 
 		// Skip invalid URLs
-		if linkURL.Scheme == "" || linkURL.Host == "" {
+		if linkURL.Scheme != "http" && linkURL.Scheme != "https" {
 			return
 		}
 
@@ -201,13 +286,13 @@ func (c *Crawler) extractLinks(r *colly.Response, doc *goquery.Document) {
 		}
 
 		// Skip non-HTML content
-		if c.skipURL(linkURL.String()) {
+		if c.skipURL(normalized) {
 			return
 		}
 
-		// Add to frontier
+		// Add to link list for DB
 		link := &models.PageLink{
-			TargetURL:  linkURL.String(),
+			TargetURL:  normalized,
 			AnchorText: strings.TrimSpace(s.Text()),
 			LinkType:   "dofollow",
 			CreatedAt:  time.Now(),
@@ -217,38 +302,35 @@ func (c *Crawler) extractLinks(r *colly.Response, doc *goquery.Document) {
 		linksFound++
 	})
 
-	// Save links in batch - get the page ID from the database
+	// Save links in batch
 	if len(linksToSave) > 0 {
-		// Get the integer page ID from the database
 		pageIntID, err := c.store.GetPageIDByURL(r.Request.URL.String())
+		if err == nil {
+			if err := c.store.SaveLinks(linksToSave, pageIntID); err != nil {
+				log.Printf("Failed to save %d links: %v", len(linksToSave), err)
+			}
+		}
+	}
+
+	// Add URLs to frontier (batch add)
+	if len(linksToSave) > 0 {
+		urls := make([]string, len(linksToSave))
+		for i, link := range linksToSave {
+			urls[i] = link.TargetURL
+		}
+		added, err := c.frontier.AddURLs(urls, 1, c.config.MaxDepth)
 		if err != nil {
-			log.Printf("Failed to get page ID for %s: %v", r.Request.URL.String(), err)
-			// Skip saving links if we can't get the page ID
-			return
-		}
-
-		if err := c.store.SaveLinks(linksToSave, pageIntID); err != nil {
-			log.Printf("Failed to save links: %v", err)
-		}
-	}
-
-	// Add URLs to frontier
-	urls := make([]string, len(linksToSave))
-	for i, link := range linksToSave {
-		urls[i] = link.TargetURL
-	}
-	if len(urls) > 0 {
-		if _, err := c.frontier.AddURLs(urls, 1, 1); err != nil {
 			log.Printf("Failed to add URLs to frontier: %v", err)
+		} else {
+			log.Printf("Added %d/%d new URLs to frontier from %s", added, len(urls), r.Request.URL)
 		}
 	}
 
 	c.statsMutex.Lock()
 	c.stats.LinksFound += int64(linksFound)
 	c.statsMutex.Unlock()
-
-	log.Printf("Found %d links on %s", linksFound, r.Request.URL)
 }
+
 
 // isBlockedDomain checks if domain is blocked
 func (c *Crawler) isBlockedDomain(domain string) bool {

@@ -332,7 +332,6 @@ tables["crawled_pages"] = Table(
     Column("final_url", String(2048)),
     Column("title", String(1024)),
     Column("content", Text),
-    Column("html_content", Text),
     Column("meta_description", Text),
     Column("meta_keywords", Text),
     Column("language", String(10), default="en"),
