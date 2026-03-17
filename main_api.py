@@ -10,13 +10,13 @@ import time
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Optional
-from sentence_transformers import CrossEncoder
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRouter
 from fastapi.websockets import WebSocket
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from sentence_transformers import CrossEncoder
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -381,33 +381,33 @@ async def rerank_endpoint(request: dict[str, Any]):
     Expected request: {"query": "...", "documents": [{"id": "...", "text": "..."}]}
     """
     rerank_requests.inc()
-    
+
     query = request.get("query")
     documents = request.get("documents", [])
-    
+
     if not query or not documents:
         raise HTTPException(status_code=400, detail="Missing 'query' or 'documents'")
-    
+
     model = get_cross_encoder()
     if not model:
         raise HTTPException(status_code=503, detail="Re-ranking model not available")
-    
+
     # Prepare pairs for re-ranking
     pairs = [[query, doc.get("text", "")] for doc in documents]
-    
+
     # Generate scores
     scores = model.predict(pairs)
-    
+
     # Attach scores to documents
     results = []
     for i, doc in enumerate(documents):
         doc_copy = dict(doc)
         doc_copy["rerank_score"] = float(scores[i])
         results.append(doc_copy)
-    
+
     # Sort by score descending
     results.sort(key=lambda x: x["rerank_score"], reverse=True)
-    
+
     return {"results": results}
 
 
