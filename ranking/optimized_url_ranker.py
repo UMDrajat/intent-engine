@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
-from config.optimized_cache import get_embedding_cache
 from config.hybrid_query_cache import get_url_analysis_cache
+from config.optimized_cache import get_embedding_cache
 from core.schema import EthicalDimension, UniversalIntent
 
 logger = logging.getLogger(__name__)

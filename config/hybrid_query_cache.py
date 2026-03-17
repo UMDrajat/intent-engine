@@ -22,7 +22,8 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any
 
-from config.redis_cache import RedisCache, cache as get_redis_cache
+from config.redis_cache import RedisCache
+from config.redis_cache import cache as get_redis_cache
 
 logger = logging.getLogger(__name__)
 
