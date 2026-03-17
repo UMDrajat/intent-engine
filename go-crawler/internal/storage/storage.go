@@ -28,14 +28,62 @@ type StorageConfig struct {
 
 // NewStorage creates a new storage instance
 func NewStorage(config *StorageConfig) (*Storage, error) {
+	// Open BadgerDB (always enabled for optimal performance)
+	opts := badger.DefaultOptions(config.BadgerPath)
+	if config.ReadOnly {
+		opts.ReadOnly = true
+		opts.BypassLockGuard = true
+		opts.Logger = nil // Reduce noise in read-only mode
+	}
+
+	var badgerDB *badger.DB
+	var err error
+	// Try to open BadgerDB with retries for lock acquisition (important for Windows/WSL2 or rapid restarts)
+	maxRetries := 5
+	if config.ReadOnly {
+		maxRetries = 2 // Fewer retries for read-only
+	}
+
+	for i := 0; i < maxRetries; i++ {
+		badgerDB, err = badger.Open(opts)
+		if err == nil {
+			log.Println("Opened BadgerDB")
+			break
+		}
+
+		// If it's a lock error and we have retries left, wait and try again
+		if strings.Contains(err.Error(), "Cannot acquire directory lock") && i < maxRetries-1 {
+			log.Printf("Warning: BadgerDB lock busy, retrying in 1s (%d/%d)...", i+1, maxRetries)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		// Other errors or out of retries
+		if config.ReadOnly {
+			// In read-only mode, BadgerDB might not exist yet - this is okay
+			log.Printf("Warning: BadgerDB not available in read-only mode: %v", err)
+			log.Println("Continuing without BadgerDB (HTML content will not be available)")
+			err = nil // Don't return error
+			break
+		} else {
+			return nil, fmt.Errorf("failed to open BadgerDB: %w", err)
+		}
+	}
+
 	// Connect to PostgreSQL
 	postgres, err := sql.Open("postgres", config.PostgresDSN)
 	if err != nil {
+		if badgerDB != nil {
+			badgerDB.Close()
+		}
 		return nil, fmt.Errorf("failed to open PostgreSQL: %w", err)
 	}
 
 	// Test connection
 	if err := postgres.Ping(); err != nil {
+		if badgerDB != nil {
+			badgerDB.Close()
+		}
 		return nil, fmt.Errorf("failed to ping PostgreSQL: %w", err)
 	}
 
@@ -46,32 +94,35 @@ func NewStorage(config *StorageConfig) (*Storage, error) {
 
 	log.Println("Connected to PostgreSQL")
 
-	// Open BadgerDB (always enabled for optimal performance)
-	opts := badger.DefaultOptions(config.BadgerPath)
-	if config.ReadOnly {
-		opts.ReadOnly = true
-		opts.BypassLockGuard = true
-		opts.Logger = nil // Reduce noise in read-only mode
-	}
-
-	badgerDB, err := badger.Open(opts)
-	if err != nil {
-		if config.ReadOnly {
-			// In read-only mode, BadgerDB might not exist yet - this is okay
-			log.Printf("Warning: BadgerDB not available in read-only mode: %v", err)
-			log.Println("Continuing without BadgerDB (HTML content will not be available)")
-		} else {
-			postgres.Close()
-			return nil, fmt.Errorf("failed to open BadgerDB: %w", err)
-		}
-	} else {
-		log.Println("Opened BadgerDB")
-	}
-
 	return &Storage{
 		postgres: postgres,
 		badger:   badgerDB,
 	}, nil
+}
+
+// Close closes both database connections
+func (s *Storage) Close() error {
+	var errs []string
+
+	if s.badger != nil {
+		log.Println("Closing BadgerDB...")
+		if err := s.badger.Close(); err != nil {
+			errs = append(errs, fmt.Sprintf("badger close error: %v", err))
+		}
+	}
+
+	if s.postgres != nil {
+		log.Println("Closing PostgreSQL...")
+		if err := s.postgres.Close(); err != nil {
+			errs = append(errs, fmt.Sprintf("postgres close error: %v", err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("errors closing storage: %s", strings.Join(errs, "; "))
+	}
+
+	return nil
 }
 
 // SavePage saves a crawled page to both PostgreSQL and BadgerDB
@@ -316,27 +367,6 @@ func (s *Storage) GetStats() (*models.CrawlStats, error) {
 	}
 
 	return stats, nil
-}
-
-// Close closes both database connections
-func (s *Storage) Close() error {
-	var errs []error
-
-	if s.badger != nil {
-		if err := s.badger.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close BadgerDB: %w", err))
-		}
-	}
-
-	if err := s.postgres.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("failed to close PostgreSQL: %w", err))
-	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf("errors closing storage: %v", errs)
-	}
-
-	return nil
 }
 
 // UpdateStats updates daily crawl statistics

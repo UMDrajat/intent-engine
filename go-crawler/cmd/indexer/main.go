@@ -29,10 +29,11 @@ func main() {
 	log.Printf("Bleve Path: %s", *blevePath)
 	log.Printf("Batch Size: %d, Interval: %ds", *batchSize, *interval)
 
-	// Initialize storage
+	// Initialize storage (read-only for indexer)
 	storeCfg := &storage.StorageConfig{
 		PostgresDSN: *postgresDSN,
 		BadgerPath:  *badgerPath,
+		ReadOnly:    true,
 	}
 	store, err := storage.NewStorage(storeCfg)
 	if err != nil {

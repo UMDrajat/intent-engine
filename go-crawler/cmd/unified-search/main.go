@@ -174,6 +174,11 @@ func main() {
 		qdrantAddr = "qdrant:6333"
 	}
 
+	intentEngineAPIURL := os.Getenv("INTENT_ENGINE_API_URL")
+	if intentEngineAPIURL == "" {
+		intentEngineAPIURL = "http://intent-engine-api:8000"
+	}
+
 	log.Printf("Starting Unified Search Service on port %s", port)
 	log.Printf("SearXNG URL: %s", searxngURL)
 	log.Printf("Bleve Path: %s", blevePath)
@@ -181,6 +186,7 @@ func main() {
 	log.Printf("Cache Enabled: %v, TTL: %v", cacheEnabled, cacheTTL)
 	log.Printf("Parallel Search: %v", parallelSearch)
 	log.Printf("Qdrant Address: %s", qdrantAddr)
+	log.Printf("Intent Engine API: %s", intentEngineAPIURL)
 
 	// Initialize storage (read-only for API)
 	storeCfg := &storage.StorageConfig{
@@ -196,10 +202,24 @@ func main() {
 	}
 	defer store.Close()
 
-	// Initialize indexer
-	searchIndexer, err = indexer.NewSearchIndexerWithOptions(blevePath, store, true)
-	if err != nil {
-		log.Fatalf("Failed to initialize indexer: %v", err)
+	// Wait a bit to let the indexer create the index if it's new
+	log.Println("Waiting 5s for storage and index to stabilize...")
+	time.Sleep(5 * time.Second)
+
+	// Initialize indexer with retries
+	var searchIndexerInitErr error
+	for i := 0; i < 5; i++ {
+		searchIndexer, searchIndexerInitErr = indexer.NewSearchIndexerWithOptions(blevePath, store, true)
+		if searchIndexerInitErr == nil {
+			log.Println("Search indexer initialized successfully")
+			break
+		}
+		log.Printf("Warning: Failed to initialize search indexer (attempt %d/5): %v", i+1, searchIndexerInitErr)
+		time.Sleep(5 * time.Second)
+	}
+
+	if searchIndexerInitErr != nil {
+		log.Fatalf("Failed to initialize indexer after retries: %v", searchIndexerInitErr)
 	}
 	defer searchIndexer.Close()
 
@@ -221,7 +241,7 @@ func main() {
 	// Initialize vector search (Qdrant)
 	var vectorSearch *VectorSearch
 	if qdrantAddr != "" {
-		vectorSearch = NewVectorSearch(qdrantAddr)
+		vectorSearch = NewVectorSearch(qdrantAddr, "intent_vectors", intentEngineAPIURL)
 		if err := vectorSearch.Ping(); err != nil {
 			log.Printf("Warning: Qdrant not available: %v (vector search disabled)", err)
 			vectorSearch = nil
@@ -430,17 +450,19 @@ func setInCache(key string, response *UnifiedSearchResponse) {
 
 // VectorSearch provides vector similarity search using Qdrant
 type VectorSearch struct {
-	client      *http.Client
-	qdrantAddr  string
-	collection  string
+	client             *http.Client
+	qdrantAddr         string
+	collection         string
+	intentEngineAPIURL string
 }
 
 // NewVectorSearch creates a new vector search client
-func NewVectorSearch(qdrantAddr string) *VectorSearch {
+func NewVectorSearch(qdrantAddr, collection, apiURL string) *VectorSearch {
 	return &VectorSearch{
-		client:     &http.Client{Timeout: 5 * time.Second},
-		qdrantAddr: qdrantAddr,
-		collection: "intent_vectors",
+		client:             &http.Client{Timeout: 5 * time.Second},
+		qdrantAddr:         qdrantAddr,
+		collection:         collection,
+		intentEngineAPIURL: apiURL,
 	}
 }
 
@@ -454,65 +476,94 @@ func (vs *VectorSearch) Ping() error {
 	return nil
 }
 
+// embedText gets embedding for text from the Python API
+func (vs *VectorSearch) embedText(text string) ([]float64, error) {
+	reqBody, _ := json.Marshal(map[string]string{"text": text})
+	resp, err := vs.client.Post(
+		fmt.Sprintf("%s/embed", vs.intentEngineAPIURL),
+		"application/json",
+		strings.NewReader(string(reqBody)),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("embedding API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Embedding []float64 `json:"embedding"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result.Embedding, nil
+}
+
 // Search performs vector similarity search
 func (vs *VectorSearch) Search(query string, limit int, queryIntent *intent.DeclaredIntent) ([]UnifiedSearchResult, int64) {
 	results := make([]UnifiedSearchResult, 0)
 	startTime := time.Now()
-	
-	// For now, return empty results since we need embedding service
-	// In production, would:
-	// 1. Call Python embedding service to get query vector
+
+	// 1. Get embedding for the query from the Python API
+	queryVector, err := vs.embedText(query)
+	if err != nil {
+		log.Printf("Warning: Failed to get embedding for query: %v", err)
+		// Fallback to dummy vector if API fails, so we can still see if Qdrant responds
+		queryVector = make([]float64, 384)
+		for i := range queryVector {
+			queryVector[i] = 0.01
+		}
+	}
+
 	// 2. Search Qdrant for similar vectors
-	// 3. Return results with vector scores
-	
-	// Placeholder: query Qdrant directly with a simple vector
-	// This would be replaced with real embeddings
-	queryVector := make([]float64, 384)
-	for i := range queryVector {
-		queryVector[i] = 0.01 // Dummy vector for testing
-	}
-	
 	searchReq := map[string]interface{}{
-		"vector": queryVector,
-		"limit": limit,
+		"vector":       queryVector,
+		"limit":        limit,
 		"with_payload": true,
-		"with_vector": false,
+		"with_vector":  false,
 	}
-	
+
+	reqJSON, _ := json.Marshal(searchReq)
 	resp, err := vs.client.Post(
 		fmt.Sprintf("http://%s/collections/%s/points/search", vs.qdrantAddr, vs.collection),
 		"application/json",
-		strings.NewReader(fmt.Sprintf("%v", searchReq)),
+		strings.NewReader(string(reqJSON)),
 	)
-	
+
 	if err == nil {
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
 		var qdrantResp struct {
 			Result []struct {
-				Score   float64            `json:"score"`
+				Score   float64                `json:"score"`
 				Payload map[string]interface{} `json:"payload"`
 			} `json:"result"`
 		}
 		json.Unmarshal(body, &qdrantResp)
-		
+
 		for i, res := range qdrantResp.Result {
 			result := UnifiedSearchResult{
-				URL:     fmt.Sprintf("%v", res.Payload["url"]),
-				Title:   fmt.Sprintf("%v", res.Payload["title"]),
-				Content: truncateContent(fmt.Sprintf("%v", res.Payload["content"]), 200),
-				Score:   res.Score,
-				Rank:    i + 1,
-				Source:  "vector",
+				URL:         fmt.Sprintf("%v", res.Payload["url"]),
+				Title:       fmt.Sprintf("%v", res.Payload["title"]),
+				Content:     truncateContent(fmt.Sprintf("%v", res.Payload["content"]), 200),
+				Score:       res.Score,
+				Rank:        i + 1,
+				Source:      "vector",
 				VectorScore: res.Score,
 			}
 			results = append(results, result)
 		}
+	} else {
+		log.Printf("Warning: Qdrant search failed: %v", err)
 	}
-	
+
 	searchLatency.WithLabelValues("vector").Observe(time.Since(startTime).Seconds())
 	searchRequestsTotal.WithLabelValues("vector", "success").Inc()
-	
+
 	return results, int64(len(results))
 }
 

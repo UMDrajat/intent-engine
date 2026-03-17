@@ -39,8 +39,8 @@ CREATE INDEX IF NOT EXISTS idx_crawled_pages_pagerank ON crawled_pages(pagerank)
 CREATE TABLE IF NOT EXISTS page_links (
     id SERIAL PRIMARY KEY,
     source_page_id VARCHAR(255) NOT NULL,
-    target_url VARCHAR(2048) NOT NULL,
-    anchor_text VARCHAR(512),
+    target_url VARCHAR(4096) NOT NULL,
+    anchor_text VARCHAR(2048),
     link_type VARCHAR(50) DEFAULT 'dofollow',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     FOREIGN KEY (source_page_id) REFERENCES crawled_pages(id) ON DELETE CASCADE

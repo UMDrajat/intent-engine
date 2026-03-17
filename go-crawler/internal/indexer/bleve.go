@@ -73,13 +73,38 @@ func NewSearchIndexerWithOptions(blevePath string, store *storage.Storage, readO
 
 	if readOnly {
 		// Open in read-only mode for shared access
-		// Note: We use regular Open but the index files are mounted read-only from the host
-		index, err = bleve.Open(blevePath)
-		if err != nil {
-			log.Printf("Bleve open error details: %v", err)
-			return nil, fmt.Errorf("failed to open Bleve index in read-only mode: %w", err)
+		log.Printf("Attempting to open Bleve index at %s in READ-ONLY mode...", blevePath)
+		
+		// Use OpenUsing with explicit read_only option
+		openConfig := map[string]interface{}{
+			"read_only": true,
 		}
-		log.Printf("Opened existing Bleve index at %s in READ-ONLY mode (via mounted volume)", blevePath)
+		
+		// Still use a timeout to be safe
+		type openResult struct {
+			idx bleve.Index
+			err error
+		}
+		resultChan := make(chan openResult, 1)
+
+		go func() {
+			idx, openErr := bleve.OpenUsing(blevePath, openConfig)
+			resultChan <- openResult{idx, openErr}
+		}()
+
+		select {
+		case res := <-resultChan:
+			if res.err == nil {
+				index = res.idx
+				log.Printf("Successfully opened existing Bleve index at %s in READ-ONLY mode", blevePath)
+			} else {
+				log.Printf("Warning: Failed to open Bleve index at %s: %v. Falling back to in-memory index.", blevePath, res.err)
+				index, _ = bleve.NewMemOnly(mapping)
+			}
+		case <-time.After(5 * time.Second):
+			log.Printf("Warning: timeout waiting to open Bleve index at %s. Falling back to in-memory index.", blevePath)
+			index, _ = bleve.NewMemOnly(mapping)
+		}
 	} else {
 		// Open or create index in read-write mode (uses Scorch backend by default)
 		index, err = bleve.Open(blevePath)
