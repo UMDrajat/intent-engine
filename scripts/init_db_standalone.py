@@ -4,6 +4,11 @@
 import os
 import sys
 
+# Ensure /app is on the path so `from app.xxx import ...` works when this script
+# is executed as:  python scripts/init_db_standalone.py  (no -m flag)
+if "/app" not in sys.path:
+    sys.path.insert(0, "/app")
+
 # Configure database URL directly
 DATABASE_URL = os.getenv("DATABASE_URL")
 

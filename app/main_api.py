@@ -124,7 +124,7 @@ async def lifespan(app: FastAPI):
     """Lifecycle events for the FastAPI application."""
     # Startup: Initialize DB, load models, etc.
     logger.info("Starting Intent Engine API...")
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine, checkfirst=True)
     
     # Mark models as loaded (in a real app, this would happen after loading)
     from app.config.health_checks import health_checker
