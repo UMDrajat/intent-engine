@@ -278,33 +278,45 @@ def convert_dict_to_universal_intent(intent_dict: dict[str, Any]) -> UniversalIn
 
     ethical_signals = []
     for s in inferred_dict.get("ethicalSignals", []) or []:
-        dimension = s.get("dimension")
-        if isinstance(dimension, str) and dimension in [d.value for d in EthicalDimension]:
-            dimension = EthicalDimension(dimension)
+        dimension_val = s.get("dimension")
+        dimension = EthicalDimension.ETHICS  # Default fallback
+        if isinstance(dimension_val, str):
+            for d in EthicalDimension:
+                if d.value == dimension_val:
+                    dimension = d
+                    break
+        
         ethical_signals.append(
             EthicalSignal(
                 dimension=dimension,
-                score=s.get("score", 0.0),
-                evidence=s.get("evidence", ""),
+                preference=s.get("preference", "privacy-first"),
             )
         )
 
     temporal_dict = inferred_dict.get("temporalIntent", {}) or {}
+    
     horizon = temporal_dict.get("horizon")
     if isinstance(horizon, str) and horizon in [h.value for h in TemporalHorizon]:
         horizon = TemporalHorizon(horizon)
+    else:
+        horizon = TemporalHorizon.FLEXIBLE
+        
     frequency = temporal_dict.get("frequency")
     if isinstance(frequency, str) and frequency in [f.value for f in Frequency]:
         frequency = Frequency(frequency)
+    else:
+        frequency = Frequency.FLEXIBLE
+        
     recency = temporal_dict.get("recency")
     if isinstance(recency, str) and recency in [r.value for r in Recency]:
         recency = Recency(recency)
+    else:
+        recency = Recency.EVERGREEN
 
     temporal = TemporalIntent(
         horizon=horizon,
         frequency=frequency,
         recency=recency,
-        specificDate=temporal_dict.get("specificDate"),
     )
 
     inferred = InferredIntent(
@@ -315,19 +327,22 @@ def convert_dict_to_universal_intent(intent_dict: dict[str, Any]) -> UniversalIn
         temporalIntent=temporal,
     )
 
-    feedback_dict = intent_dict.get("feedback", {}) or {}
+    feedback_dict = intent_dict.get("sessionFeedback", intent_dict.get("feedback", {})) or {}
     feedback = SessionFeedback(
-        relevanceScore=feedback_dict.get("relevanceScore"),
-        satisfied=feedback_dict.get("satisfied"),
-        corrections=feedback_dict.get("corrections", []) or [],
+        clicked=feedback_dict.get("clicked"),
+        dwell=feedback_dict.get("dwell"),
+        reformulated=feedback_dict.get("reformulated"),
+        bounced=feedback_dict.get("bounced"),
     )
 
+    import uuid
     return UniversalIntent(
-        id=intent_dict.get("id", ""),
-        timestamp=intent_dict.get("timestamp", datetime.now(UTC).isoformat()),
+        intentId=intent_dict.get("intentId", intent_dict.get("id", f"intent_{uuid.uuid4().hex}")),
+        context=intent_dict.get("context", {}),
         declared=declared,
         inferred=inferred,
-        feedback=feedback,
+        sessionFeedback=feedback,
+        expiresAt=intent_dict.get("expiresAt", ""),
     )
 
 
@@ -478,8 +493,31 @@ async def api_match_ads(request: AdMatchingRequest):
         if isinstance(intent, dict):
             intent = convert_dict_to_universal_intent(intent)
 
-        matched_ads = match_ads(intent, request.adInventory)
-        return AdMatchingResponse(matched_ads=matched_ads)
+        matched_ads_data = request.ad_inventory or []
+        from app.ads.matcher import AdMatchingRequest as InternalAdMatchingRequest, AdMetadata
+        
+        internal_request = InternalAdMatchingRequest(
+            intent=intent,
+            adInventory=[AdMetadata(**ad) for ad in matched_ads_data],
+            config=request.config
+        )
+        
+        matcher_response = match_ads(internal_request)
+        
+        # Convert internal MatchedAd objects to dicts for the response model
+        matched_ads_dicts = []
+        for m in matcher_response.matchedAds:
+            ad_dict = m.ad.__dict__ if hasattr(m.ad, "__dict__") else m.ad
+            matched_ads_dicts.append({
+                "ad": ad_dict,
+                "relevance_score": m.adRelevanceScore,
+                "match_reasons": m.matchReasons
+            })
+            
+        return AdMatchingResponse(
+            matched_ads=matched_ads_dicts,
+            metrics=matcher_response.metrics
+        )
     except Exception as e:
         logger.error(f"Ad matching error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -745,9 +783,10 @@ async def get_campaign_performance(db: Session = Depends(lambda: next(db_manager
                 impressions=roi_data.impressions if roi_data else 0,
                 clicks=roi_data.clicks if roi_data else 0,
                 conversions=roi_data.conversions if roi_data else 0,
-                spend=roi_data.total_spend if roi_data else campaign.budget,
-                revenue=roi_data.total_revenue if roi_data else 0.0,
-                roi=roi_data.roi if roi_data else 0.0,
+                ctr=roi_data.ctr if roi_data else 0.0,
+                cpc=(roi_data.total_spend / roi_data.clicks) if roi_data and roi_data.clicks > 0 else 0.0,
+                cost=roi_data.total_spend if roi_data else float(campaign.budget or 0),
+                roas=roi_data.roas if roi_data else 0.0,
             ))
         return reports
     except Exception as e:
