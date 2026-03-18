@@ -434,6 +434,7 @@ class UserConsent(Base):
     User consent for tracking user consent (matches user_consents table in init script)
     """
     __tablename__ = "user_consents"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, nullable=False, index=True)
@@ -446,16 +447,13 @@ class UserConsent(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    __table_args__ = (
-        Index("ix_user_consents_user_id_consent_type", "user_id", "consent_type"),
-    )
-
 
 class AuditTrail(Base):
     """
     Audit trail for tracking system events (matches audit_trails table in init script)
     """
     __tablename__ = "audit_trails"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=True)
@@ -468,11 +466,6 @@ class AuditTrail(Base):
     payload = Column(JSON, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        Index("ix_audit_trails_event_type", "event_type"),
-        Index("ix_audit_trails_resource_type_id", "resource_type", "resource_id"),
-    )
 
 
 # Create tables if they don't exist
