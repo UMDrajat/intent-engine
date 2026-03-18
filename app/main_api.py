@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Optional
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRouter
 from fastapi.websockets import WebSocket
@@ -332,10 +332,11 @@ def convert_dict_to_universal_intent(intent_dict: dict[str, Any]) -> UniversalIn
 
 
 # Basic Endpoints
-@app.get("/", response_model=dict[str, str])
+@app.get("/", response_model=dict[str, Any])
 async def root():
     """Root endpoint for API discovery."""
     return {
+        "status": "healthy",
         "message": "Welcome to Intent Engine API",
         "docs": "/docs",
         "health": "/health",
@@ -402,12 +403,12 @@ async def liveness_probe():
 # Core Intent Engine Endpoints
 @app.post("/extract-intent", response_model=UniversalIntent)
 @limiter.limit("10/minute")
-async def api_extract_intent(request: IntentExtractionRequest, response: Response):
+async def api_extract_intent(request: Request, extraction_request: IntentExtractionRequest, response: Response):
     """
     Extract structured intent from a natural language query.
     """
     try:
-        intent = extract_intent(request.query)
+        intent = extract_intent(extraction_request.query)
         return intent
     except Exception as e:
         logger.error(f"Intent extraction error: {e}")
@@ -653,6 +654,102 @@ async def api_rank_urls(request: URLRankingAPIRequest):
         )
     except Exception as e:
         logger.error(f"URL ranking error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Advertising Management Endpoints
+@app.get("/campaigns", response_model=list[Campaign])
+async def get_campaigns(db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get all campaigns."""
+    try:
+        campaigns = db.query(DbCampaign).all()
+        return campaigns
+    except Exception as e:
+        logger.error(f"Error getting campaigns: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/campaigns/{campaign_id}", response_model=Campaign)
+async def get_campaign(campaign_id: int, db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get a specific campaign by ID."""
+    try:
+        campaign = db.query(DbCampaign).filter(DbCampaign.id == campaign_id).first()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        return campaign
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting campaign: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/adgroups", response_model=list[AdGroup])
+async def get_ad_groups(db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get all ad groups."""
+    try:
+        ad_groups = db.query(DbAdGroup).all()
+        return ad_groups
+    except Exception as e:
+        logger.error(f"Error getting ad groups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/adgroups/{adgroup_id}", response_model=AdGroup)
+async def get_ad_group(adgroup_id: int, db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get a specific ad group by ID."""
+    try:
+        ad_group = db.query(DbAdGroup).filter(DbAdGroup.id == adgroup_id).first()
+        if not ad_group:
+            raise HTTPException(status_code=404, detail="Ad group not found")
+        return ad_group
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting ad group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/creatives/{creative_id}", response_model=CreativeAsset)
+async def get_creative(creative_id: int, db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get a specific creative asset by ID."""
+    try:
+        creative = db.query(DbCreativeAsset).filter(DbCreativeAsset.id == creative_id).first()
+        if not creative:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        return creative
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting creative: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/reports/campaign-performance", response_model=list[CampaignPerformanceReport])
+async def get_campaign_performance(db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get campaign performance reports."""
+    try:
+        from app.analytics.advanced import AnalyticsEngine
+        analytics = AnalyticsEngine(db)
+        
+        # Get all campaigns with their performance
+        campaigns = db.query(DbCampaign).all()
+        reports = []
+        for campaign in campaigns:
+            roi_data = analytics.calculate_campaign_roi(campaign.id)
+            reports.append(CampaignPerformanceReport(
+                campaign_id=campaign.id,
+                campaign_name=campaign.name,
+                impressions=roi_data.total_impressions if roi_data else 0,
+                clicks=roi_data.total_clicks if roi_data else 0,
+                conversions=roi_data.total_conversions if roi_data else 0,
+                spend=roi_data.total_spend if roi_data else campaign.budget,
+                revenue=roi_data.revenue if roi_data else 0.0,
+                roi=roi_data.roi_percentage if roi_data else 0.0,
+            ))
+        return reports
+    except Exception as e:
+        logger.error(f"Error getting campaign performance: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
