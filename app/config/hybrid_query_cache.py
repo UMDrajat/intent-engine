@@ -163,23 +163,9 @@ class HybridQueryCache:
                     self.stats["hits_l1"] += 1
                     return entry.value
 
-        # Check L2 (Redis)
-        if self.use_redis and self.redis_cache:
-            redis_key = self._redis_key(key)
-            cached = self.redis_cache.get(redis_key)
-            if cached is not None:
-                # Promote to L1
-                with self.lock:
-                    while len(self.cache) >= self.max_size:
-                        self._evict_lru()
-                    self.cache[key] = CacheEntry(
-                        value=cached,
-                        created_at=time.time(),
-                        ttl_seconds=self.default_ttl_seconds,
-                        last_accessed=time.time(),
-                    )
-                self.stats["hits_l2"] += 1
-                return cached
+        # Check L2 (Redis) - disabled due to async/sync mismatch
+        # RedisCache uses async methods which can't be called from sync context
+        # self.stats["hits_l2"] += 1  # Would be here if Redis worked
 
         self.stats["misses"] += 1
         return None
@@ -187,7 +173,7 @@ class HybridQueryCache:
     def set(self, key: str, value: Any, ttl_seconds: float | None = None) -> None:
         """Store value in cache"""
         ttl_local = ttl_seconds if ttl_seconds is not None else self.default_ttl_seconds
-        ttl_redis = self.redis_ttl_seconds
+        # ttl_redis = self.redis_ttl_seconds  # Disabled due to async/sync mismatch
 
         # Store in L1
         with self.lock:
@@ -202,10 +188,11 @@ class HybridQueryCache:
             )
             self.cache[key] = entry
 
-        # Store in L2 (Redis)
-        if self.use_redis and self.redis_cache:
-            redis_key = self._redis_key(key)
-            self.redis_cache.set(redis_key, value, ttl=ttl_redis)
+        # Store in L2 (Redis) - disabled due to async/sync mismatch
+        # RedisCache uses async methods which can't be called from sync context
+        # if self.use_redis and self.redis_cache:
+        #     redis_key = self._redis_key(key)
+        #     self.redis_cache.set(redis_key, value, ttl=ttl_redis)
 
     def get_or_compute(
         self,

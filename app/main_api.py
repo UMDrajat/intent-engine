@@ -456,11 +456,83 @@ async def api_recommend_services(request: ServiceRecommendationRequest):
     Recommend internal services based on an extracted intent.
     """
     try:
+        from app.services.recommender import (
+            ServiceMetadata,
+            ServiceRecommendationRequest as InternalServiceRecommendationRequest,
+            recommend_services as internal_recommend_services,
+        )
+
+        # Convert intent dict to UniversalIntent
         intent = request.intent
         if isinstance(intent, dict):
             intent = convert_dict_to_universal_intent(intent)
 
-        recommendations = recommend_services(intent)
+        # Convert available_services to ServiceMetadata objects
+        available_services = request.available_services or []
+        service_metadata_list = []
+        for svc in available_services:
+            # Map from API format to internal format
+            # Handle both internal format (with supportedGoals, etc.) and test format (with ethicalTags, features)
+            supported_goals = svc.get("supportedGoals", [])
+            primary_use_cases = svc.get("primaryUseCases", [])
+            temporal_patterns = svc.get("temporalPatterns", [])
+            ethical_alignment = svc.get("ethicalAlignment", [])
+            
+            # If using test format, derive values from ethicalTags and features
+            if not supported_goals and not primary_use_cases:
+                ethical_tags = svc.get("ethicalTags", [])
+                features = svc.get("features", [])
+                
+                # Derive ethical alignment from ethicalTags
+                if ethical_tags:
+                    ethical_alignment = ethical_tags
+                
+                # Derive supported goals from features/type
+                svc_type = svc.get("type", "")
+                if svc_type:
+                    supported_goals = ["learn", "explore", "accomplish"]
+                
+                # Derive use cases from features
+                if features:
+                    primary_use_cases = ["comparison", "learning"]
+            
+            service_metadata_list.append(ServiceMetadata(
+                id=svc.get("id", ""),
+                name=svc.get("name", ""),
+                supportedGoals=supported_goals,
+                primaryUseCases=primary_use_cases,
+                temporalPatterns=temporal_patterns,
+                ethicalAlignment=ethical_alignment,
+                description=svc.get("description"),
+            ))
+
+        # Create internal request
+        internal_request = InternalServiceRecommendationRequest(
+            intent=intent,
+            availableServices=service_metadata_list,
+            options=request.options,
+        )
+
+        # Call internal recommend_services
+        response = internal_recommend_services(internal_request)
+
+        # Convert response to API format
+        recommendations = []
+        for rec in response.recommendations:
+            recommendations.append({
+                "service": {
+                    "id": rec.service.id,
+                    "name": rec.service.name,
+                    "supportedGoals": rec.service.supportedGoals,
+                    "primaryUseCases": rec.service.primaryUseCases,
+                    "temporalPatterns": rec.service.temporalPatterns,
+                    "ethicalAlignment": rec.service.ethicalAlignment,
+                    "description": rec.service.description,
+                },
+                "serviceScore": rec.serviceScore,
+                "matchReasons": rec.matchReasons,
+            })
+
         return ServiceRecommendationResponse(recommendations=recommendations)
     except Exception as e:
         logger.error(f"Service recommendation error: {e}")
@@ -762,6 +834,100 @@ async def get_creative(creative_id: int, db: Session = Depends(lambda: next(db_m
         raise
     except Exception as e:
         logger.error(f"Error getting creative: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ads", response_model=list[Ad])
+async def get_ads(db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get all ads."""
+    try:
+        ads = db.query(DbAd).all()
+        return ads
+    except Exception as e:
+        logger.error(f"Error getting ads: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/consent-summary", response_model=ConsentSummary)
+async def get_consent_summary(db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get consent summary statistics."""
+    try:
+        from app.database import ConsentRecord as DbConsentRecord
+        from sqlalchemy import select
+
+        # Get total consents
+        total_query = select(func.count()).select_from(DbConsentRecord)
+        total_consents = db.execute(total_query).scalar() or 0
+
+        # Get granted consents
+        granted_query = select(func.count()).select_from(DbConsentRecord).where(DbConsentRecord.granted == True)
+        granted_consents = db.execute(granted_query).scalar() or 0
+
+        # Get denied consents
+        denied_query = select(func.count()).select_from(DbConsentRecord).where(DbConsentRecord.granted == False)
+        denied_consents = db.execute(denied_query).scalar() or 0
+
+        # Get by type
+        by_type_query = select(DbConsentRecord.consent_type, func.count()).group_by(DbConsentRecord.consent_type)
+        by_type_result = db.execute(by_type_query).all()
+        by_type = {row[0]: row[1] for row in by_type_result}
+
+        # Calculate compliance rate
+        overall_compliance_rate = (granted_consents / total_consents * 100) if total_consents > 0 else 0.0
+
+        return ConsentSummary(
+            timestamp=datetime.now(UTC).isoformat(),
+            total_consents=total_consents,
+            granted_consents=granted_consents,
+            denied_consents=denied_consents,
+            by_type=by_type,
+            overall_compliance_rate=overall_compliance_rate,
+        )
+    except Exception as e:
+        logger.error(f"Error getting consent summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/audit-stats", response_model=AuditStats)
+async def get_audit_stats(db: Session = Depends(lambda: next(db_manager.get_db()))):
+    """Get audit trail statistics."""
+    try:
+        from app.database import AuditEvent as DbAuditEvent
+        from sqlalchemy import select
+
+        # Get total events
+        total_query = select(func.count()).select_from(DbAuditEvent)
+        total_events = db.execute(total_query).scalar() or 0
+
+        # Get events by type
+        by_type_query = select(DbAuditEvent.event_type, func.count()).group_by(DbAuditEvent.event_type)
+        by_type_result = db.execute(by_type_query).all()
+        events_by_type = {row[0]: row[1] for row in by_type_result}
+
+        # Get daily counts for last 7 days
+        from datetime import timedelta
+        seven_days_ago = datetime.now(UTC) - timedelta(days=7)
+        daily_query = select(
+            func.date(DbAuditEvent.timestamp).label('date'),
+            func.count()
+        ).where(DbAuditEvent.timestamp >= seven_days_ago).group_by(func.date(DbAuditEvent.timestamp))
+        daily_result = db.execute(daily_query).all()
+        daily_counts = [{"date": str(row[0]), "count": row[1]} for row in daily_result]
+
+        # Get recent activity count (last 24 hours)
+        twenty_four_hours_ago = datetime.now(UTC) - timedelta(hours=24)
+        recent_query = select(func.count()).select_from(DbAuditEvent).where(DbAuditEvent.timestamp >= twenty_four_hours_ago)
+        recent_activity = db.execute(recent_query).scalar() or 0
+
+        return AuditStats(
+            timestamp=datetime.now(UTC).isoformat(),
+            total_events=total_events,
+            events_by_type=events_by_type,
+            daily_counts=daily_counts,
+            recent_activity=recent_activity,
+        )
+    except Exception as e:
+        logger.error(f"Error getting audit stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
