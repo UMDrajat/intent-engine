@@ -140,12 +140,34 @@ class GoSearchClient:
 
     async def add_seed_urls(self, urls: list[str], priority: int = 5, depth: int = 0) -> bool:
         """Add seed URLs to crawl queue."""
+        if not self.enabled or not urls:
+            return False
+
         try:
             session = await self._get_session()
-            payload = {"urls": urls, "priority": priority, "depth": depth}
+            
+            # Use "urls" as the primary field name, but include "seed_urls" for compatibility
+            payload = {
+                "urls": urls,
+                "seed_urls": urls,
+                "priority": priority,
+                "depth": depth
+            }
 
-            async with session.post(f"{self.base_url}/api/v1/crawl/seed", json=payload) as response:
-                return response.status == 200
+            # Try /api/v1/crawl/seed first (standard), then fallback to /api/v1/add-urls
+            endpoints = ["/api/v1/crawl/seed", "/api/v1/add-urls"]
+            
+            for endpoint in endpoints:
+                try:
+                    async with session.post(f"{self.base_url}{endpoint}", json=payload) as response:
+                        if response.status == 200:
+                            logger.info(f"Successfully added {len(urls)} URLs via {endpoint}")
+                            return True
+                except Exception as e:
+                    logger.debug(f"Failed to add URLs via {endpoint}: {e}")
+                    continue
+            
+            return False
         except Exception as e:
             logger.error(f"Add seed URLs error: {e}")
             return False

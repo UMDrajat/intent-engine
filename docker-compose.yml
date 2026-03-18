@@ -54,7 +54,7 @@ services:
       - REDIS_TIMEOUT=5.0
       - API_HOST=0.0.0.0
       - API_PORT=8000
-      - ENVIRONMENT=production
+      - ENVIRONMENT=development
       - LOG_LEVEL=INFO
       - ENABLE_CORS=true
       - CORS_ORIGINS=http://localhost:3000,http://localhost:8080,https://yourdomain.com
@@ -65,6 +65,7 @@ services:
       - RATE_LIMIT_ENABLED=true
       - RATE_LIMIT_DEFAULT=100/minute
       - RATE_LIMIT_STRICT=10/minute
+      - RATE_LIMIT_STORAGE_URL=redis://redis:6379/0
       - SEARXNG_BASE_URL=http://searxng:8080
       - PLAYWRIGHT_BROWSERS_PATH=/app/pw-browsers
     volumes:
@@ -80,11 +81,11 @@ services:
         reservations:
           memory: 2G
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 120s
     depends_on:
       migrations:
         condition: service_completed_successfully
@@ -135,7 +136,7 @@ services:
       - intent-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -237,7 +238,7 @@ services:
       - searxng
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8082/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3

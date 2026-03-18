@@ -2,32 +2,35 @@
 
 > **Organized Documentation Structure** - Find what you need quickly
 
-**Last Updated:** March 16, 2026 | **Version:** v2.1.1 - Self-Improving Search Loop
+**Last Updated:** March 18, 2026 | **Version:** v2.3.0 - Configuration & Health Improvements
 
 ---
 
-## 🎯 What's New in v2.1
+## 🎯 What's New in v2.3.0
 
-### Self-Improving Search Loop (v2.0+)
-- **Every search makes the system smarter!**
-- +634,000 URLs added from just 3 searches
-- Redis caching (11x faster)
-- Prometheus + Grafana monitoring
-- Qdrant vector search integration
-- Automatic URL seeding from search results
+### Configuration Management
+- **Centralized Pydantic Settings** - Type-safe configuration with validation
+- **8 Structured Settings Classes** - Database, Redis, Security, SearXNG, ML, Privacy, Monitoring, Application
+- **Startup Validation** - Critical environment variables validated at startup
+- **Redis-Backed Rate Limiting** - Works across multiple workers
 
-### Enhanced Features (v2.1)
-- Comprehensive fraud detection for clicks, impressions, and conversions
-- Real-time analytics with WebSocket broadcasting
-- Enhanced privacy controls with GDPR compliance
-- Advanced A/B testing with statistical significance
-- Complete campaign management lifecycle
-- Seed discovery and topic expansion
+### Health Monitoring
+- **Comprehensive Health Checks** - 9 services monitored
+- **Kubernetes-Style Probes** - Readiness and liveness endpoints
+- **Response Time Metrics** - Track performance of all services
+- **New Endpoints:** `/health/detailed`, `/health/ready`, `/health/live`
+
+### Documentation
+- **IMPROVEMENTS.md** - Comprehensive summary of v2.3.0 changes
+- **CONTRIBUTING.md** - Complete rewrite with contributor journey
+- **PR Template** - Consistent quality for pull requests
+- **CHANGELOG.md** - Complete release history
 
 **Key Documentation:**
-- [Self-Improving Loop Architecture](docs/architecture/SELF_IMPROVING_LOOP.md) - Complete architecture guide
-- [API Endpoints](README.md#api-endpoints) - Full API reference
-- [Deployment Checklist](docs/deployment/DEPLOYMENT_CHECKLIST.md) - Production deployment
+- [IMPROVEMENTS.md](IMPROVEMENTS.md) - v2.3.0 changes summary
+- [CHANGELOG.md](CHANGELOG.md) - Complete release history
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guide
+- [Health Checks Guide](config/health_checks.py) - Health monitoring implementation
 
 ---
 

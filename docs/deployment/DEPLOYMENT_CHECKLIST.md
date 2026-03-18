@@ -2,6 +2,9 @@
 
 Use this checklist to ensure your Intent Engine search backend is properly configured for production deployment.
 
+**Version:** v2.3.0 - Configuration & Health Improvements  
+**Last Updated:** March 18, 2026
+
 ---
 
 ## Pre-Deployment
@@ -14,7 +17,8 @@ Use this checklist to ensure your Intent Engine search backend is properly confi
   python -c "import secrets; print(secrets.token_urlsafe(32))"
   ```
   - [ ] Update `.env`: `SECRET_KEY=<your-generated-key>`
-  - [ ] Update `docker-compose.prod.yml` with same key
+  - [ ] Update `docker-compose.yml` with same key
+  - [ ] **v2.3.0:** Key is validated at startup (min 32 chars)
 
 - [ ] **Change Database Password**
   ```bash
@@ -22,15 +26,19 @@ Use this checklist to ensure your Intent Engine search backend is properly confi
   python -c "import secrets; print(secrets.token_urlsafe(16))"
   ```
   - [ ] Update `.env`: `POSTGRES_PASSWORD=<your-secure-password>`
-  - [ ] Update `docker-compose.prod.yml` with same password
+  - [ ] Update `docker-compose.yml` with same password
   - [ ] Update `DATABASE_URL` with new password
+  - [ ] **v2.3.0:** Password validated at startup (not default)
 
 - [ ] **Configure CORS**
   - [ ] Update `.env`: `CORS_ORIGINS=https://yourdomain.com`
   - [ ] Remove localhost origins in production
 
-- [ ] **Enable Rate Limiting**
-  - [ ] Verify `RATE_LIMIT_ENABLED=true` in `.env`
+- [ ] **Rate Limiting Configuration** ⭐ v2.3.0
+  - [ ] **CRITICAL:** Use Redis-backed rate limiting for multi-worker
+  - [ ] Update `.env`: `RATE_LIMIT_STORAGE_URL=redis://redis:6379/0`
+  - [ ] **DO NOT USE** `memory://` in production (doesn't work across workers)
+  - [ ] Verify `RATE_LIMIT_ENABLED=true`
   - [ ] Adjust limits based on expected traffic
 
 ### 2. SSL/TLS Configuration
@@ -214,9 +222,39 @@ Use this checklist to ensure your Intent Engine search backend is properly confi
   - [ ] Resource usage alerts
   - [ ] Slow response time alerts
 
-- [ ] **Health Checks**
-  - [ ] Automated health checks running
-  - [ ] Auto-restart on failure enabled
+- [ ] **Health Checks** ⭐ v2.3.0 Enhanced
+  - [ ] **Liveness Probe:** `GET /health/live` - Container orchestrator checks
+  - [ ] **Readiness Probe:** `GET /health/ready` - Load balancer checks
+  - [ ] **Detailed Health:** `GET /health/detailed` - Full service diagnostics
+  - [ ] Docker Compose health checks configured (see `docker-compose.yml`)
+  - [ ] Kubernetes probes configured (if using K8s)
+  - [ ] Health check alerts configured
+  
+  **Health Check Endpoints:**
+  ```bash
+  # Basic health
+  curl http://localhost:8000/health
+  
+  # Detailed health with response times
+  curl http://localhost:8000/health/detailed | jq
+  
+  # Readiness (200=ready, 503=not ready)
+  curl -f http://localhost:8000/health/ready
+  
+  # Liveness (200=alive, 503=unhealthy)
+  curl -f http://localhost:8000/health/live
+  ```
+  
+  **Monitored Services (v2.3.0):**
+  - Database (PostgreSQL)
+  - Redis/Valkey
+  - SearXNG
+  - Go Crawler
+  - Go Indexer
+  - Go Search API
+  - Unified Search API
+  - Qdrant Vector DB
+  - ML Models
 
 ### 10. Maintenance
 

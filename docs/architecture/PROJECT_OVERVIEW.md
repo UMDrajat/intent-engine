@@ -1,7 +1,7 @@
 # Intent Engine - Project Overview
 
-**Version:** v2.1.1 - Self-Improving Search Loop
-**Last Updated:** March 16, 2026
+**Version:** v2.3.0 - Configuration & Health Improvements
+**Last Updated:** March 18, 2026
 **Repository:** [intent-engine](https://github.com/itxLikhith/intent-engine)
 **Docker Image:** `anony45/intent-engine-api:latest`
 **License:** [IECL v1.0](../../LICENSE)
@@ -20,6 +20,28 @@ The Intent Engine is a **privacy-first, intent-driven system** for search, servi
 4. **Non-Discriminatory**: Matching algorithms never use sensitive attributes
 5. **Transparent**: Intent extraction rules are inspectable and rule-based
 6. **Self-Improving**: Every search makes the system smarter via automatic URL seeding
+7. **Type-Safe Configuration**: Centralized Pydantic settings with validation
+8. **Comprehensive Monitoring**: Authoritative health checks for all services
+
+### Key Features (v2.3.0)
+
+#### Configuration Management ⭐ NEW
+- ✅ **Centralized Pydantic Settings** - Type-safe configuration with validation
+- ✅ **8 Structured Settings Classes** - Database, Redis, Security, SearXNG, ML, Privacy, Monitoring, Application
+- ✅ **Startup Validation** - Critical environment variables validated at startup
+- ✅ **Redis-Backed Rate Limiting** - Works across multiple workers/containers
+
+#### Health Monitoring ⭐ NEW
+- ✅ **Comprehensive Health Checks** - 9 services monitored (Database, Redis, SearXNG, Go services, Qdrant, Models)
+- ✅ **Kubernetes-Style Probes** - Readiness (`/health/ready`) and liveness (`/health/live`) endpoints
+- ✅ **Response Time Metrics** - Track performance of all services
+- ✅ **Detailed Diagnostics** - Full service health at `/health/detailed`
+
+#### Developer Experience ⭐ NEW
+- ✅ **Auto-Generated Requirements** - `scripts/generate_requirements.py` keeps deps in sync
+- ✅ **Enhanced CONTRIBUTING.md** - Complete contributor journey with branch strategy
+- ✅ **PR Template** - Consistent quality for pull requests
+- ✅ **Fixed License Declaration** - pyproject.toml correctly declares IECL-1.0
 
 ### Key Features (v2.1)
 

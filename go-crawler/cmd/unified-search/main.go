@@ -258,6 +258,7 @@ func main() {
 	r.HandleFunc("/stats", statsHandler).Methods("GET", "HEAD")
 	r.HandleFunc("/api/v1/search", createSearchHandler(vectorSearch)).Methods("POST")
 	r.HandleFunc("/api/v1/add-urls", addURLsHandler).Methods("POST")
+	r.HandleFunc("/api/v1/crawl/seed", addURLsHandler).Methods("POST")
 	r.Handle("/metrics", promhttp.Handler()).Methods("GET")
 
 	log.Printf("Unified Search Service ready on :%s", port)
@@ -1011,6 +1012,7 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 func addURLsHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URLs     []string `json:"urls"`
+		SeedURLs []string `json:"seed_urls"` // For compatibility with some clients
 		Priority int      `json:"priority"`
 	}
 
@@ -1019,11 +1021,18 @@ func addURLsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Combine both URL lists
+	allURLs := append(req.URLs, req.SeedURLs...)
+	if len(allURLs) == 0 {
+		http.Error(w, "No URLs provided", http.StatusBadRequest)
+		return
+	}
+
 	if req.Priority <= 0 {
 		req.Priority = 5
 	}
 
-	added := addURLsToQueueWithPriority(req.URLs, req.Priority)
+	added := addURLsToQueueWithPriority(allURLs, req.Priority)
 
 	response := map[string]interface{}{
 		"success":   true,

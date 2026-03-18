@@ -137,7 +137,7 @@ migrations:
 	done
 
 seed:
-	python seed_sample_data.py
+	python scripts/seed_sample_data.py
 
 # ============================================================================
 # Documentation
@@ -154,16 +154,16 @@ docs-serve:
 # ============================================================================
 
 push:
-	python autopush.py
+	python scripts/autopush.py
 
 quickpush:
-	python autopush.py --no-check
+	python scripts/autopush.py --no-check
 
 fixpush:
-	python autopush.py --fix
+	python scripts/autopush.py --fix
 
 dryrun:
-	python autopush.py --dry-run
+	python scripts/autopush.py --dry-run
 
 # Short aliases
 p: push

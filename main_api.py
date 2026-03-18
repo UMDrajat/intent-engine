@@ -593,7 +593,7 @@ async def shutdown_event():
 
 @app.get("/", response_model=HealthCheckResponse)
 async def root_health_check():
-    """Root health check endpoint"""
+    """Root health check endpoint - basic liveness probe"""
     return HealthCheckResponse(status="healthy", timestamp=datetime.now(UTC), version="1.0.0")
 
 
@@ -602,120 +602,127 @@ async def health_check(db: Session = Depends(get_db)):
     """
     Comprehensive health check endpoint that verifies all dependencies.
 
-    Checks:
+    This endpoint uses the authoritative HealthCheckService for accurate
+    status reporting of all services including:
     - Database connectivity
-    - Redis connectivity (if configured)
-    - SearXNG connectivity (if configured)
+    - Redis connectivity
+    - SearXNG connectivity (with proper /healthz endpoint check)
+    - Go Crawler, Go Indexer, Go Search API
+    - Unified Search API
+    - Qdrant vector database
     - Model loading status
+
+    Returns detailed status for each service with response times.
     """
+    from config.health_checks import health_checker
+
+    # Run comprehensive health checks
+    system_health = await health_checker.check_all(include_optional=True)
+
+    # Build checks dict for backward compatibility
     checks = {
-        "database": True,
-        "redis": True,
-        "searxng": True,
-        "models_loaded": True,
+        "database": system_health.services.get("database", {}).status == "healthy" if hasattr(system_health.services.get("database", {}), "status") else True,
+        "redis": system_health.services.get("redis", {}).status == "healthy" if hasattr(system_health.services.get("redis", {}), "status") else True,
+        "searxng": system_health.services.get("searxng", {}).status == "healthy" if hasattr(system_health.services.get("searxng", {}), "status") else True,
+        "models_loaded": system_health.services.get("models", {}).status == "healthy" if hasattr(system_health.services.get("models", {}), "status") else True,
     }
-    overall_status = "healthy"
 
-    # Check database connectivity
-    try:
-        db.execute(text("SELECT 1"))
-        logger.debug("Database health check: OK")
-    except Exception as e:
-        checks["database"] = False
-        logger.error(f"Database health check failed: {e}")
-        overall_status = "degraded"
-
-    # Check Redis connectivity (optional)
-    redis_url = os.getenv("REDIS_URL")
-    if redis_url:
-        try:
-            import redis as redis_lib
-
-            redis_client = redis_lib.from_url(redis_url, socket_timeout=5)
-            redis_client.ping()
-            logger.debug("Redis health check: OK")
-        except Exception as e:
-            checks["redis"] = False
-            logger.warning(f"Redis health check failed: {e}")
-            if overall_status == "healthy":
-                overall_status = "degraded"
-    else:
-        checks["redis"] = True  # Not configured, so consider it OK
-        logger.debug("Redis not configured, skipping health check")
-
-    # Check SearXNG connectivity (optional)
-    searxng_url = os.getenv("SEARXNG_BASE_URL") or os.getenv("SEARXNG_URL", "http://searxng:8080")
-    if "localhost" in searxng_url and os.getenv("KUBERNETES_SERVICE_HOST"):
-        # If in K8s/Docker and URL is localhost, try service name instead
-        searxng_url = "http://searxng:8080"
-
-    try:
-        import aiohttp
-
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
-            # Try configured URL
-            try:
-                async with session.get(f"{searxng_url}/healthz", raise_for_status=False) as response:
-                    if response.status == 200:
-                        logger.debug(f"SearXNG health check ({searxng_url}): OK")
-                    else:
-                        raise Exception(f"Status {response.status}")
-            except Exception as e:
-                # Try localhost fallback if not already localhost
-                if "localhost" not in searxng_url:
-                    try:
-                        async with session.get("http://localhost:8080/healthz", raise_for_status=False) as resp:
-                            if resp.status == 200:
-                                logger.debug("SearXNG health check (localhost fallback): OK")
-                            else:
-                                raise Exception(f"Status {resp.status}")
-                    except:
-                        checks["searxng"] = False
-                        logger.warning(f"SearXNG health check failed for {searxng_url}: {e}")
-                        if overall_status == "healthy":
-                            overall_status = "degraded"
-                else:
-                    checks["searxng"] = False
-                    logger.warning(f"SearXNG health check failed for {searxng_url}: {e}")
-                    if overall_status == "healthy":
-                        overall_status = "degraded"
-    except ImportError:
-        # aiohttp not available, skip SearXNG check
-        checks["searxng"] = True
-        logger.debug("aiohttp not available, skipping SearXNG health check")
-    except Exception as e:
-        checks["searxng"] = False
-        logger.warning(f"SearXNG health check failed: {e}")
-        if overall_status == "healthy":
-            overall_status = "degraded"
-
-    # Check if models are loaded (check one of the singletons)
-    try:
-        from ranking.ranker import _intent_ranker_instance
-
-        if _intent_ranker_instance is None:
-            checks["models_loaded"] = False
-            logger.warning("Models not loaded yet")
-            if overall_status == "healthy":
-                overall_status = "degraded"
-    except Exception as e:
-        checks["models_loaded"] = False
-        logger.error(f"Model loading check failed: {e}")
-        if overall_status == "healthy":
-            overall_status = "degraded"
-
-    # Determine overall status
-    if not any(checks.values()):
-        overall_status = "unhealthy"
-    elif not all(checks.values()):
-        overall_status = "degraded"
+    # Log detailed health status
+    for service_name, service_health in system_health.services.items():
+        if service_health.status != "healthy":
+            logger.warning(
+                f"Health check [{service_name.value}]: {service_health.status} "
+                f"- {service_health.error or 'OK'}"
+            )
 
     return HealthCheckResponse(
-        status=overall_status,
-        timestamp=datetime.now(UTC),
+        status=system_health.status.value,
+        timestamp=system_health.timestamp,
         checks=checks,
-        version="1.0.0",
+        version=system_health.version,
     )
+
+
+@app.get("/health/detailed")
+async def health_check_detailed():
+    """
+    Detailed health check endpoint with full service information.
+
+    Returns comprehensive health status including:
+    - Response times for each service
+    - Error messages
+    - Service URLs (sanitized)
+    - System uptime
+    - Environment information
+
+    This is useful for debugging and monitoring dashboards.
+    """
+    from config.health_checks import health_checker
+
+    system_health = await health_checker.check_all(include_optional=True)
+    return system_health.to_dict()
+
+
+@app.get("/health/ready")
+async def readiness_probe():
+    """
+    Kubernetes-style readiness probe.
+
+    Returns 200 if the service is ready to accept traffic.
+    Returns 503 if not ready (e.g., models still loading).
+
+    This endpoint is designed for load balancer health checks.
+    """
+    from config.health_checks import health_checker
+    from fastapi.responses import JSONResponse
+
+    is_ready = await health_checker.check_readiness()
+
+    if is_ready:
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ready", "timestamp": datetime.now(UTC).isoformat()},
+        )
+    else:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "timestamp": datetime.now(UTC).isoformat(),
+                "reason": "Models not loaded or critical services unavailable",
+            },
+        )
+
+
+@app.get("/health/live")
+async def liveness_probe():
+    """
+    Kubernetes-style liveness probe.
+
+    Returns 200 if the service is alive.
+    Returns 503 if the service is deadlocked or unresponsive.
+
+    This endpoint is designed for container orchestrators to detect
+    when a container needs to be restarted.
+    """
+    from config.health_checks import health_checker
+    from fastapi.responses import JSONResponse
+
+    is_alive = await health_checker.check_liveness()
+
+    if is_alive:
+        return JSONResponse(
+            status_code=200,
+            content={"status": "alive", "timestamp": datetime.now(UTC).isoformat()},
+        )
+    else:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
 
 
 @app.post("/extract-intent", response_model=dict[str, Any])

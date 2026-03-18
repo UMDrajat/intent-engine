@@ -2,6 +2,9 @@
 
 > **Get your privacy-first search engine running in 5 minutes**
 
+**Version:** v2.3.0 - Configuration & Health Improvements  
+**Last Updated:** March 18, 2026
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
@@ -9,8 +12,9 @@
 3. [Configuration](#configuration)
 4. [Starting Services](#starting-services)
 5. [Testing the API](#testing-the-api)
-6. [Common Tasks](#common-tasks)
-7. [Troubleshooting](#troubleshooting)
+6. [Health Checks](#health-checks) ⭐ NEW
+7. [Common Tasks](#common-tasks)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -74,10 +78,25 @@ cp .env.example .env
 
 ```bash
 # IMPORTANT: Change this in production!
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
 SECRET_KEY=your-secure-random-string-here
 
 # Change database password
 POSTGRES_PASSWORD=your-secure-password
+
+# IMPORTANT: For production/multi-worker, use Redis-backed rate limiting
+# Memory-based rate limiting doesn't work across multiple workers
+RATE_LIMIT_STORAGE_URL=redis://localhost:6379/0
+```
+
+### Configuration Validation (v2.3.0)
+
+The system now validates critical settings at startup:
+- SECRET_KEY must be set and secure (production)
+- DATABASE_PASSWORD must not be default (production)
+- Rate limiting should use Redis (multi-worker deployments)
+
+If validation fails, you'll see clear error messages at startup.
 
 # Update CORS origins for your domain
 CORS_ORIGINS=https://yourdomain.com
@@ -232,6 +251,79 @@ Once services are running, visit:
 
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
+
+---
+
+## Health Checks ⭐ NEW (v2.3.0)
+
+### Basic Health Check
+
+```bash
+# Simple liveness check
+curl http://localhost:8000/
+
+# Comprehensive health check
+curl http://localhost:8000/health
+```
+
+### Detailed Health Status
+
+Get detailed health information with response times:
+
+```bash
+curl http://localhost:8000/health/detailed | jq
+```
+
+**Example Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-03-18T12:00:00Z",
+  "services": {
+    "database": {
+      "status": "healthy",
+      "response_time_ms": 5.2
+    },
+    "redis": {
+      "status": "healthy",
+      "response_time_ms": 2.1
+    },
+    "searxng": {
+      "status": "healthy",
+      "response_time_ms": 45.3
+    }
+  },
+  "uptime_seconds": 3600
+}
+```
+
+### Kubernetes-Style Probes
+
+**Readiness Probe** (is the service ready to accept traffic?):
+
+```bash
+curl -f http://localhost:8000/health/ready
+# Returns 200 if ready, 503 if not ready
+```
+
+**Liveness Probe** (is the service alive?):
+
+```bash
+curl -f http://localhost:8000/health/live
+# Returns 200 if alive, 503 if unhealthy
+```
+
+### Health Check in Docker
+
+Docker Compose automatically checks service health:
+
+```bash
+# Check service health status
+docker-compose -f docker-compose.prod.yml ps
+
+# View health check logs
+docker inspect --format='{{json .State.Health}}' intent-engine-api | jq
+```
 
 ---
 

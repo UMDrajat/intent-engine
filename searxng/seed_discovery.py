@@ -208,21 +208,32 @@ class SeedURLDiscovery:
                 url_list = [u["url"] for u in urls]
 
                 # POST to crawler's seed endpoint
+                # Support both field names for maximum compatibility
                 payload = {
+                    "urls": url_list,
                     "seed_urls": url_list,
                     "priority": 5,  # Medium priority for discovered URLs
                     "depth": 2,
                 }
 
-                async with session.post(
-                    f"{crawler_api_url}/api/v1/crawl/seed", json=payload, timeout=aiohttp.ClientTimeout(total=10)
-                ) as response:
-                    if response.status == 200:
-                        logger.info(f"Added {len(urls)} URLs to crawler queue")
-                        return True
-                    else:
-                        logger.warning(f"Crawler seed endpoint returned {response.status}")
-                        return False
+                # Try both common endpoints
+                endpoints = ["/api/v1/crawl/seed", "/api/v1/add-urls"]
+                
+                success = False
+                for endpoint in endpoints:
+                    try:
+                        async with session.post(
+                            f"{crawler_api_url}{endpoint}", json=payload, timeout=aiohttp.ClientTimeout(total=10)
+                        ) as response:
+                            if response.status == 200:
+                                logger.info(f"Added {len(urls)} URLs to crawler via {endpoint}")
+                                success = True
+                                break
+                    except Exception as e:
+                        logger.debug(f"Failed to add URLs via {endpoint}: {e}")
+                        continue
+                
+                return success
 
         except Exception as e:
             logger.error(f"Failed to add URLs to crawler: {e}")

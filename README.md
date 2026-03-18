@@ -8,11 +8,45 @@
 [![Version](https://img.shields.io/badge/version-2.3.1-blue.svg)](https://github.com/itxLikhith/intent-engine)
 [![License](https://img.shields.io/badge/license-IECL--v1.0-red.svg)](LICENSE)
 
-**Latest Release:** v2.3.1 - Self-Improving Search Loop | **Docker Image:** `anony45/intent-engine-api:latest`
+**Latest Release:** v2.3.1 - Configuration & Health Improvements | **Docker Image:** `anony45/intent-engine-api:latest`
 
 ---
 
-## 🎯 What's New in v2.1
+## 🎯 What's New in v2.3.0 / v2.3.1
+
+### ⚙️ Configuration Management
+**Centralized Pydantic Settings** - Type-safe configuration with validation:
+- 8 structured settings classes (Database, Redis, Security, SearXNG, ML, Privacy, Monitoring, Application)
+- Startup validation for critical environment variables
+- Production-ready secret validation
+- Redis-backed rate limiting (works across multiple workers)
+
+### 🏥 Comprehensive Health Checks
+**Authoritative Health Monitoring** - Monitor all services with detailed diagnostics:
+- 9 services monitored (Database, Redis, SearXNG, Go Crawler, Go Indexer, Go Search API, Unified Search, Qdrant, Models)
+- Kubernetes-style readiness and liveness probes
+- Response time metrics for all services
+- New endpoints: `/health/detailed`, `/health/ready`, `/health/live`
+
+### 📦 Dependency Management
+**Single Source of Truth** - No more dependency drift:
+- `pyproject.toml` aligned with requirements files
+- Auto-generation script for requirements.txt
+- Removed duplicate tooling (Black, isort) - Ruff handles everything
+
+### 📚 Enhanced Documentation
+**Complete Contributor Journey**:
+- Rewritten CONTRIBUTING.md with branch strategy, PR checklist, local dev setup
+- PR template for consistent quality
+- Fixed script path references
+- IMPROVEMENTS.md with comprehensive change summary
+
+### 🔒 License Clarity
+**Fixed License Declaration** - pyproject.toml now correctly declares IECL-1.0
+
+---
+
+## 🎯 What's New in v2.1 (Self-Improving Loop)
 
 ### 🔄 Self-Improving Search Loop (v2.0+)
 
@@ -457,11 +491,16 @@ LOG_LEVEL=INFO
 
 ## API Endpoints
 
-### Core Intent & Search
-- `GET /` - Health check endpoint
-- `GET /health` - Detailed health check (DB, Redis, SearXNG)
+### System & Health (v2.3.0)
+- `GET /` - Basic liveness probe
+- `GET /health` - Comprehensive health check (all services)
+- `GET /health/detailed` - Full service health with response times ⭐ NEW
+- `GET /health/ready` - Kubernetes readiness probe (200/503) ⭐ NEW
+- `GET /health/live` - Kubernetes liveness probe (200/503) ⭐ NEW
 - `GET /status` - Service status with version info
 - `GET /metrics` - Prometheus metrics
+
+### Core Intent & Search
 - `POST /extract-intent` - Extract structured intent from user query
 - `POST /search` - Unified privacy search with intent extraction and ranking
 - `POST /rank-results` - Rank results based on user intent
