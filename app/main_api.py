@@ -15,6 +15,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, R
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRouter
 from fastapi.websockets import WebSocket
+from pydantic import BaseModel
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
 from sentence_transformers import CrossEncoder
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -108,8 +109,44 @@ from app.services.recommender import recommend_services
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address)
+# Global variables for Go Unified Search API support
+sentence_encoder = None
+cross_encoder = None
+
+# Sentence Transformer configuration
+SENTENCE_TRANSFORMERS_MODEL = os.getenv("SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
+SENTENCE_TRANSFORMERS_DEVICE = os.getenv("SENTENCE_TRANSFORMERS_DEVICE", "cpu")
+
+
+def get_client_ip(request: Request) -> str:
+    """
+    Get client IP address from request headers.
+    Uses X-Forwarded-For header to get the real client IP behind proxies.
+    Falls back to remote address with port for differentiation in AIO container.
+    """
+    # Check X-Forwarded-For header (set by nginx/proxies)
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # X-Forwarded-For can contain multiple IPs: client, proxy1, proxy2, ...
+        # Take the first one (original client)
+        return forwarded_for.split(",")[0].strip()
+    
+    # Check X-Real-IP header (set by nginx)
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    
+    # For AIO container (all requests from 127.0.0.1), use client port to differentiate
+    # This allows multiple concurrent clients to be rate-limited separately
+    client_host = request.client.host if request.client else "unknown"
+    client_port = request.client.port if request.client else 0
+    
+    # Return IP:port combination for better differentiation
+    return f"{client_host}:{client_port}"
+
+
+# Initialize rate limiter with custom key function
+limiter = Limiter(key_func=get_client_ip)
 
 # Define v1 router
 v1_router = APIRouter(prefix="/v1")
@@ -125,14 +162,56 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize DB, load models, etc.
     logger.info("Starting Intent Engine API...")
     Base.metadata.create_all(bind=engine, checkfirst=True)
-    
+
+    # Initialize Redis Cache
+    try:
+        from app.config.redis_cache import initialize_cache
+        redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+        await initialize_cache(redis_url)
+        logger.info("Redis cache initialized in lifespan")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Redis cache: {e}")
+
+    # Pre-load ML models to avoid cold start latency
+    global sentence_encoder, cross_encoder
+    try:
+        logger.info("Loading sentence transformer model...")
+        from sentence_transformers import SentenceTransformer
+        sentence_encoder = SentenceTransformer(
+            SENTENCE_TRANSFORMERS_MODEL, 
+            device=SENTENCE_TRANSFORMERS_DEVICE
+        )
+        logger.info(f"Sentence transformer loaded: {SENTENCE_TRANSFORMERS_MODEL}")
+        
+        logger.info("Loading cross-encoder model...")
+        cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        logger.info("Cross-encoder loaded successfully")
+    except Exception as e:
+        logger.warning(f"Failed to preload ML models: {e}")
+        logger.warning("Models will be loaded on first request (cold start)")
+
     # Mark models as loaded (in a real app, this would happen after loading)
     from app.config.health_checks import health_checker
     health_checker.mark_models_loaded()
-    
+    logger.info("Intent Engine API startup complete")
+
     yield
+    
     # Shutdown: Clean up resources
     logger.info("Shutting down Intent Engine API...")
+    try:
+        from app.config.arq_pool import close_arq_pool
+        await close_arq_pool()
+        logger.info("ARQ pool closed in lifespan")
+    except Exception as e:
+        logger.warning(f"Failed to close ARQ pool: {e}")
+
+    try:
+        from app.config.redis_cache import close_cache
+        await close_cache()
+        logger.info("Redis cache closed in lifespan")
+    except Exception as e:
+        logger.warning(f"Failed to close Redis cache: {e}")
 
 app = FastAPI(
     title="Intent Engine API",
@@ -363,8 +442,25 @@ async def root():
 async def health_check():
     """Authoritative health check endpoint."""
     from app.config.health_checks import health_checker
-    
+
     system_health = await health_checker.check_all()
+    return system_health.to_dict()
+
+
+@app.get("/health/detailed", response_model=dict[str, Any])
+async def health_check_detailed():
+    """
+    Detailed health check with all services and response times.
+    
+    Returns comprehensive health information including:
+    - All service statuses with response times
+    - Version information
+    - Environment details
+    - Uptime
+    """
+    from app.config.health_checks import health_checker
+
+    system_health = await health_checker.check_all(include_optional=True)
     return system_health.to_dict()
 
 
@@ -415,6 +511,96 @@ async def liveness_probe():
         )
 
 
+# =============================================================================
+# Go Unified Search API Support Endpoints
+# =============================================================================
+
+class EmbeddingRequest(BaseModel):
+    """Request model for embedding endpoint."""
+    text: str
+
+class EmbeddingResponse(BaseModel):
+    """Response model for embedding endpoint."""
+    embedding: list[float]
+
+class RerankRequest(BaseModel):
+    """Request model for reranking endpoint."""
+    query: str
+    results: list[dict[str, Any]]
+
+class RerankResponse(BaseModel):
+    """Response model for reranking endpoint."""
+    results: list[dict[str, Any]]
+
+@app.post("/embed", response_model=EmbeddingResponse)
+async def get_embedding(request: EmbeddingRequest):
+    """
+    Get sentence embedding for text using Sentence Transformers.
+    Used by Go Unified Search API for vector search.
+    """
+    try:
+        # Use the global sentence_encoder if available, otherwise load on-demand
+        global sentence_encoder
+        if sentence_encoder is None:
+            from sentence_transformers import SentenceTransformer
+            sentence_encoder = SentenceTransformer(SENTENCE_TRANSFORMERS_MODEL, device=SENTENCE_TRANSFORMERS_DEVICE)
+        
+        # Generate embedding
+        embedding = sentence_encoder.encode(request.text, convert_to_numpy=True, normalize_embeddings=True)
+        
+        return EmbeddingResponse(embedding=embedding.tolist())
+    except Exception as e:
+        logger.error(f"Error generating embedding: {e}")
+        raise HTTPException(status_code=500, detail=f"Embedding generation failed: {str(e)}")
+
+
+@app.post("/rerank", response_model=RerankResponse)
+async def rerank_results(request: RerankRequest):
+    """
+    Rerank search results using cross-encoder for better relevance.
+    Used by Go Unified Search API for semantic re-ranking.
+    """
+    try:
+        # Load cross-encoder if not already loaded
+        global cross_encoder
+        if cross_encoder is None:
+            cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        
+        # Prepare pairs for cross-encoder
+        pairs = []
+        for result in request.results:
+            title = result.get("title", "")
+            content = result.get("content", "")
+            text = f"{title} {content}".strip()
+            if text:
+                pairs.append([request.query, text])
+        
+        if not pairs:
+            return RerankResponse(results=request.results)
+        
+        # Get cross-encoder scores
+        scores = cross_encoder.predict(pairs)
+        
+        # Add scores to results and sort
+        reranked = []
+        for i, result in enumerate(request.results):
+            if i < len(scores):
+                result["rerank_score"] = float(scores[i])
+                # Adjust final score with rerank
+                original_score = result.get("score", 1.0)
+                result["score"] = original_score * (0.3 + 0.7 * scores[i])
+            reranked.append(result)
+        
+        # Sort by adjusted score
+        reranked.sort(key=lambda x: x.get("score", 0), reverse=True)
+        
+        return RerankResponse(results=reranked)
+    except Exception as e:
+        logger.error(f"Error reranking results: {e}")
+        # Return original results if reranking fails
+        return RerankResponse(results=request.results)
+
+
 # Core Intent Engine Endpoints
 @app.post("/extract-intent")
 @limiter.limit("10/minute")
@@ -436,15 +622,76 @@ async def api_extract_intent(request: Request, extraction_request: IntentExtract
 async def api_rank_results(request: RankingRequest):
     """
     Rank a list of candidates based on an extracted intent.
+
+    Accepts both 'candidates' and 'results' fields for backwards compatibility.
+
+    Example payload:
+    {
+        "intent": {
+            "declared": {
+                "query": "learn python",
+                "goal": "LEARN",
+                "constraints": []
+            }
+        },
+        "candidates": [  // or "results": [...]
+            {"title": "Python.org", "url": "https://python.org", "content": "Official Python site"}
+        ],
+        "options": {}
+    }
     """
     try:
-        # Convert dict to UniversalIntent if necessary
+        from app.ranking.ranker import SearchResult as RankingSearchResult, RankingRequest as RankingServiceRequest
+        import uuid
+        
+        # Convert intent dict to UniversalIntent if necessary
         intent = request.intent
         if isinstance(intent, dict):
             intent = convert_dict_to_universal_intent(intent)
+        
+        # Convert candidate dicts to SearchResult objects
+        candidates = request.get_candidates()
+        search_results = []
+        for i, c in enumerate(candidates):
+            search_results.append(RankingSearchResult(
+                id=c.get("id", str(uuid.uuid4())),
+                title=c.get("title", ""),
+                description=c.get("content", "") or c.get("description", ""),
+                platform=c.get("platform"),
+                provider=c.get("provider"),
+                license=c.get("license"),
+                price=c.get("price"),
+                tags=c.get("tags", []),
+                qualityScore=c.get("qualityScore", 0.5),
+                recency=c.get("recency") or c.get("published_date"),
+                complexity=c.get("complexity"),
+                compatibility=c.get("compatibility", []),
+                privacyRating=c.get("privacyRating"),
+                opensource=c.get("opensource"),
+            ))
+        
+        # Create ranking request with proper objects
+        ranking_request = RankingServiceRequest(
+            intent=intent,
+            candidates=search_results,
+            options=request.options
+        )
 
-        ranked_results = rank_results(intent, request.candidates)
-        return RankingResponse(results=ranked_results)
+        # Call rank_results with the request object
+        ranking_response = rank_results(ranking_request)
+        
+        # Convert ranking response to API format
+        ranked_results_dicts = []
+        for result in ranking_response.rankedResults:
+            ranked_results_dicts.append({
+                "url": result.result.id,  # Use id as URL for now
+                "title": result.result.title,
+                "content": result.result.description,
+                "ranked_score": result.alignmentScore,
+                "match_reasons": result.matchReasons,
+            })
+        
+        return RankingResponse(ranked_results=ranked_results_dicts)
     except Exception as e:
         logger.error(f"Ranking error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -547,7 +794,8 @@ async def api_unified_search(request: UnifiedSearchRequest):
     """
     try:
         search_service = get_unified_search_service()
-        results = await search_service.search(request.query, limit=request.limit)
+        # Pass the full request object (not just query and limit)
+        results = await search_service.search(request)
         return results
     except Exception as e:
         logger.error(f"Unified search error: {e}")

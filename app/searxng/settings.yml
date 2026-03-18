@@ -83,17 +83,17 @@ engines:
     disabled: true
 
 outgoing:
-  pool_connections: 50
-  pool_maxsize: 15
+  pool_connections: 100
+  pool_maxsize: 30
   enable_http2: true
   request_timeout: 2.0
-  max_request_timeout: 5.0
+  max_request_timeout: 3.0
   max_retries: 1
   retry_on_timeout: true
 
-# Valkey (Redis) caching
+# Valkey (Redis) caching - Fix: Use 127.0.0.1 for aio container
 valkey:
-  url: "redis://redis:6379/0"
+  url: "redis://127.0.0.1:6379/0"
   cache_time: 300
   limiter: false
 

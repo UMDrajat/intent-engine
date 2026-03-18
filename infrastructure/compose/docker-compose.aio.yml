@@ -28,6 +28,12 @@ services:
       - "5432:5432"
       # SearXNG direct access (optional)
       - "8080:8080"
+      # Qdrant (optional - requires ENABLE_QDRANT=true)
+      - "6333:6333"
+      # Go Search API (optional - requires ENABLE_GO_SERVICES=true)
+      - "8081:8081"
+      # Go Unified Search API (optional - requires ENABLE_GO_SERVICES=true)
+      - "8082:8082"
       # Prometheus metrics (optional)
       - "9090:9090"
     environment:
@@ -59,7 +65,33 @@ services:
       
       # SearXNG
       - SEARXNG_BASE_URL=http://127.0.0.1:8080
-      - SEARXNG_SECRET_KEY=${SEARXNG_SECRET_KEY:-}
+      - SEARXNG_SECRET_KEY=a3f8b2c1d4e5f6789012345678901234567890abcdef1234567890abcdef1234
+      
+      # Qdrant (optional)
+      - ENABLE_QDRANT=true
+      - QDRANT_HOST=127.0.0.1
+      - QDRANT_PORT=6333
+      
+      # Go Services (optional) - Requires additional database configuration
+      - ENABLE_GO_SERVICES=true
+      # Go Search API Database Configuration (overrides hardcoded "crawler" user)
+      - GO_SEARCH_DB_USER=${GO_SEARCH_DB_USER:-intent_user}
+      - GO_SEARCH_DB_PASSWORD=${GO_SEARCH_DB_PASSWORD:-intent_secure_p_ssw0rd_2026_prod}
+      - GO_SEARCH_DB_HOST=127.0.0.1
+      - GO_SEARCH_DB_PORT=5432
+      - GO_SEARCH_DB_NAME=${POSTGRES_DB:-intent_engine}
+      # Go Search API URL for Python API
+      - GO_SEARCH_API_URL=http://127.0.0.1:8081
+      - GO_CRAWLER_URL=http://127.0.0.1:8081
+      # DATABASE_URL for Go Crawler (full connection string)
+      - DATABASE_URL=postgresql://intent_user:intent_secure_p_ssw0rd_2026_prod@127.0.0.1:5432/intent_engine?sslmode=disable
+      # Unified Search Configuration
+      - SEARXNG_URL=http://127.0.0.1:8080
+      - QDRANT_ADDR=127.0.0.1:6333
+      - INTENT_ENGINE_API_URL=http://127.0.0.1:8000
+      - CACHE_ENABLED=true
+      - CACHE_TTL_SECONDS=3600
+      - PARALLEL_SEARCH=true
       
       # Security
       - SECRET_KEY=secure_random_key_for_production_2026_test_suite
@@ -70,7 +102,7 @@ services:
       # Rate Limiting
       - RATE_LIMIT_ENABLED=true
       - RATE_LIMIT_DEFAULT=100/minute
-      - RATE_LIMIT_STRICT=10/minute
+      - RATE_LIMIT_STRICT=20/minute
       - RATE_LIMIT_STORAGE_URL=redis://127.0.0.1:6379/0
       
       # Database Pool
@@ -103,23 +135,22 @@ services:
       - intent-aio-postgres:/var/lib/postgresql/data
       - intent-aio-redis:/app/data/redis
       - intent-aio-searxng:/app/data/searxng
+      - intent-aio-qdrant:/qdrant/storage
       # Application data
       - intent-aio-app-data:/app/data
       # Logs
       - intent-aio-logs:/var/log/nginx
-      # Settings
-      - ../../.env.example:/app/.env:ro
       # Optional: Mount searxng config (must be rw for entrypoint to modify)
       - ../../app/searxng:/etc/searxng:rw
     restart: unless-stopped
     deploy:
       resources:
         limits:
+          cpus: '8.0'
+          memory: 8G
+        reservations:
           cpus: '4.0'
           memory: 4G
-        reservations:
-          cpus: '2.0'
-          memory: 2G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/health/live"]
       interval: 30s
@@ -149,6 +180,12 @@ volumes:
       type: none
       o: bind
       device: ../../data/searxng
+  intent-aio-qdrant:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ../../data/qdrant
   intent-aio-app-data:
     driver: local
     driver_opts:

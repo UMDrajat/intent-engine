@@ -1,5 +1,5 @@
 # Intent Engine - Production All-in-One Container
-# Combines: PostgreSQL, Redis (Valkey), SearXNG, and Intent Engine API
+# Combines: PostgreSQL, Redis (Valkey), SearXNG, Qdrant, Go Services, and Intent Engine API
 FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -33,6 +33,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-setuptools \
         python3-yaml \
         libz-dev \
+        # Qdrant dependencies
+        wget \
+        ca-certificates \
+        # Go for building Go services
+        golang-go \
         && rm -rf /var/lib/apt/lists/*
 
 # Install SearXNG
@@ -42,12 +47,28 @@ RUN git clone https://github.com/searxng/searxng.git && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -e .
 
+# Build Go Search API and Crawler
+WORKDIR /app/go-crawler
+COPY go-crawler/go.mod go-crawler/go.sum ./
+RUN go mod download || true
+COPY go-crawler/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /usr/local/bin/search-api ./cmd/search-api && \
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /usr/local/bin/unified-search ./cmd/unified-search && \
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /usr/local/bin/go-crawler ./cmd/crawler
+
 WORKDIR /app
 # Configure PostgreSQL user
 ENV POSTGRES_USER=intent_user
 ENV POSTGRES_PASSWORD=intent_secure_password_change_in_prod
 ENV POSTGRES_DB=intent_engine
 ENV PGDATA=/var/lib/postgresql/data
+
+# Download and install Qdrant
+RUN wget -q https://github.com/qdrant/qdrant/releases/download/v1.12.5/qdrant-x86_64-unknown-linux-gnu.tar.gz -O /tmp/qdrant.tar.gz && \
+    tar -xzf /tmp/qdrant.tar.gz -C /usr/local/bin && \
+    rm /tmp/qdrant.tar.gz && \
+    mkdir -p /qdrant/storage && \
+    chmod +x /usr/local/bin/qdrant
 
 # Create PostgreSQL directories
 RUN mkdir -p /var/run/postgresql && \
@@ -93,6 +114,7 @@ RUN mkdir -p /etc/nginx/sites-available && \
 
 # Copy nginx configuration
 COPY infrastructure/docker/nginx-aio.conf /etc/nginx/sites-available/aio.conf
+RUN sed -i 's/\r$//' /etc/nginx/sites-available/aio.conf
 
 RUN ln -sf /etc/nginx/sites-available/aio.conf /etc/nginx/sites-enabled/aio.conf && \
     rm -f /etc/nginx/sites-enabled/default
@@ -102,15 +124,20 @@ RUN echo '[supervisord]\nnodaemon=true\nlogfile=/var/log/supervisor/supervisord.
 
 # Create entrypoint script
 COPY infrastructure/docker/aio-entrypoint.sh /aio-entrypoint.sh
-RUN chmod +x /aio-entrypoint.sh
+RUN chmod +x /aio-entrypoint.sh && \
+    # Fix Windows line endings (CRLF -> LF) to prevent "no such file or directory" errors
+    sed -i 's/\r$//' /aio-entrypoint.sh
 
 # Expose ports
 # 80 - nginx (main API)
 # 5432 - PostgreSQL (optional, for external access)
 # 6379 - Redis (internal)
 # 8080 - SearXNG (internal)
+# 6333 - Qdrant (optional)
+# 8081 - Go Search API (optional)
+# 8082 - Go Unified Search API (optional)
 # 9090 - Prometheus metrics (optional)
-EXPOSE 80 5432 6379 8080 9090
+EXPOSE 80 5432 6379 8080 6333 8081 8082 9090
 
 # Health check for the entire container
 HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \

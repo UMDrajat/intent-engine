@@ -188,15 +188,19 @@ class UnifiedQueryRouter:
             )
 
         # Rule 5: Privacy-focused queries → prefer Go crawler (curated)
+        # BUT: Still query SearXNG as backup since Go Crawler may not have content
         privacy_signals = [s for s in ethical_signals if s.dimension == EthicalDimension.PRIVACY]
         if privacy_signals:
-            logger.debug("Routing privacy-focused query to Go Crawler")
+            logger.debug("Routing privacy-focused query to Go Crawler + SearXNG (fallback)")
             return QueryRoute(
-                backends=[SearchBackend.GO_CRAWLER],
-                weights={SearchBackend.GO_CRAWLER: 1.0},
-                parallel=False,
-                timeout_ms=3000,
-                fallback_chain=[SearchBackend.SEARXNG],
+                backends=[SearchBackend.GO_CRAWLER, SearchBackend.SEARXNG],
+                weights={
+                    SearchBackend.GO_CRAWLER: 0.6,  # Prefer Go Crawler
+                    SearchBackend.SEARXNG: 0.4,     # But also query SearXNG
+                },
+                parallel=True,  # Query both in parallel
+                timeout_ms=4000,
+                fallback_chain=[SearchBackend.SEARXNG],  # If Go Crawler fails, use SearXNG
                 max_results_per_backend=self.default_max_results,
             )
 
@@ -305,47 +309,43 @@ class UnifiedQueryRouter:
         from app.go_search_client import GoSearchClient
 
         try:
-            # Create client and check health
-            client = GoSearchClient(base_url=self._get_go_crawler_url(), timeout=5.0)
-            try:
-                # Health check (async)
-                health = await client.health_check()
-                if health.get("status") != "healthy":
-                    logger.warning(f"Go crawler unhealthy: {health}")
-                    return []
+            # Initialize client lazily if not already done
+            if not self._go_client:
+                self._go_client = GoSearchClient(base_url=self._get_go_crawler_url(), timeout=5.0)
 
-                # Search
-                response = await client.search(query=query, limit=max_results)
+            # Optimization: Skip redundant health check for every search
+            # We rely on the search call itself failing if unhealthy (fast failure)
 
-                if not response or not response.results:
-                    return []
+            # Search
+            response = await self._go_client.search(query=query, limit=max_results)
 
-                results = [
-                    SearchResult(
-                        source=SearchBackend.GO_CRAWLER,
-                        url=r.url,
-                        title=r.title,
-                        content=r.content,
-                        score=r.score,
-                        engine="go-crawler",
-                        price=r.price,
-                        currency=r.currency,
-                        metadata={
-                            "rank": r.rank,
-                            "match_reasons": r.match_reasons or [],
-                        },
-                    )
-                    for r in response.results
-                ]
+            if not response or not response.results:
+                return []
 
-                logger.debug(f"Go crawler returned {len(results)} results")
-                return results
+            results = [
+                SearchResult(
+                    source=SearchBackend.GO_CRAWLER,
+                    url=r.url,
+                    title=r.title,
+                    content=r.content,
+                    score=r.score,
+                    engine="go-crawler",
+                    price=r.price,
+                    currency=r.currency,
+                    metadata={
+                        "rank": r.rank,
+                        "match_reasons": r.match_reasons or [],
+                    },
+                )
+                for r in response.results
+            ]
 
-            finally:
-                await client.close()
+            logger.debug(f"Go crawler returned {len(results)} results")
+            return results
 
         except Exception as e:
             logger.error(f"Go crawler search failed: {e}")
+            # If search fails, we might want to check health once for future attempts
             return []
 
     async def _search_searxng(self, query: str, max_results: int) -> list[SearchResult]:
@@ -451,13 +451,21 @@ class UnifiedQueryRouter:
 
     def _get_go_crawler_url(self) -> str:
         """Get Go crawler URL from config or environment"""
-        # Always use Docker service name in containerized environment
-        return self.config.get("go_crawler_url", "http://go-search-api:8080")
+        import os
+        # Use environment variable first (for aio container), then config
+        env_url = os.getenv("GO_CRAWLER_URL")
+        if env_url:
+            return env_url
+        return self.config.get("go_crawler_url", "http://127.0.0.1:8081")
 
     def _get_searxng_url(self) -> str:
         """Get SearXNG URL from config or environment"""
-        # Always use Docker service name in containerized environment
-        return self.config.get("searxng_url", "http://searxng:8080")
+        import os
+        # Use environment variable first (for aio container), then config
+        env_url = os.getenv("SEARXNG_URL")
+        if env_url:
+            return env_url
+        return self.config.get("searxng_url", "http://127.0.0.1:8080")
 
 
 # Singleton instance

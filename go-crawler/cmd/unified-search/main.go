@@ -33,6 +33,18 @@ var (
 	cacheEnabled     bool
 	cacheTTL         time.Duration
 	parallelSearch   bool
+
+	// Optimized HTTP client with connection pooling and timeouts
+	httpClient = &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     30 * time.Second,
+			DisableKeepAlives:   false,
+			DisableCompression:  false,
+		},
+	}
 	
 	// Prometheus metrics
 	searchRequestsTotal = prometheus.NewCounterVec(
@@ -73,6 +85,18 @@ var (
 			Buckets: prometheus.DefBuckets,
 		},
 	)
+
+	// Hot query cache (in-memory for frequently searched queries)
+	hotQueryCache = make(map[string]*SearchCacheItem)
+	hotCacheMutex = sync.RWMutex{}
+	hotCacheTTL   = 5 * time.Minute // 5 minutes for hot queries
+	hotQueries    = map[string]bool{
+		"python": true, "javascript": true, "go": true, "golang": true,
+		"docker": true, "kubernetes": true, "k8s": true, "rust": true,
+		"java": true, "typescript": true, "react": true, "nodejs": true,
+		"aws": true, "azure": true, "gcp": true, "cloud": true,
+		"api": true, "rest": true, "graphql": true, "microservices": true,
+	}
 )
 
 func init() {
@@ -130,7 +154,7 @@ type SearchCacheItem struct {
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8082"
+		port = getEnv("GO_UNIFIED_SEARCH_API_PORT", "8082")
 	}
 
 	searxngURL = os.Getenv("SEARXNG_URL")
@@ -150,12 +174,20 @@ func main() {
 
 	postgresDSN := os.Getenv("POSTGRES_DSN")
 	if postgresDSN == "" {
-		postgresDSN = "postgresql://intent_user:intent_secure_password_change_in_prod@postgres:5432/intent_engine?sslmode=disable"
+		// Build PostgreSQL DSN from environment variables
+		dbUser := getEnv("GO_SEARCH_DB_USER", "crawler")
+		dbPassword := getEnv("GO_SEARCH_DB_PASSWORD", "crawler")
+		dbHost := getEnv("GO_SEARCH_DB_HOST", "localhost")
+		dbPort := getEnv("GO_SEARCH_DB_PORT", "5432")
+		dbName := getEnv("GO_SEARCH_DB_NAME", "intent_engine")
+		postgresDSN = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable",
+			dbUser, dbPassword, dbHost, dbPort, dbName)
 	}
 
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
-		redisAddr = "redis:6379"
+		// Fix: Use 127.0.0.1 for aio container instead of docker hostname
+		redisAddr = "127.0.0.1:6379"
 	}
 
 	// Cache configuration
@@ -404,7 +436,30 @@ func generateCacheKey(query string, limit int) string {
 }
 
 // getFromCache retrieves a cached search result
+// Checks hot cache first (in-memory), then Redis
 func getFromCache(key string) (*UnifiedSearchResponse, bool) {
+	// Check hot query cache first (very fast, no network)
+	hotCacheMutex.RLock()
+	if item, ok := hotQueryCache[key]; ok {
+		hotCacheMutex.RUnlock()
+		if time.Now().Before(item.Expiration) {
+			cacheHitsTotal.Inc()
+			log.Printf("Hot cache HIT for key: %s", key[:min(50, len(key))])
+			return item.Response, true
+		}
+		// Expired, remove from hot cache
+		hotCacheMutex.Lock()
+		delete(hotQueryCache, key)
+		hotCacheMutex.Unlock()
+	} else {
+		hotCacheMutex.RUnlock()
+	}
+
+	// Check Redis cache
+	if redisClient == nil {
+		return nil, false
+	}
+	
 	ctx := context.Background()
 	data, err := redisClient.Get(ctx, key).Bytes()
 	if err == redis.Nil {
@@ -426,17 +481,33 @@ func getFromCache(key string) (*UnifiedSearchResponse, bool) {
 		return nil, false
 	}
 
+	// Promote to hot cache
+	hotCacheMutex.Lock()
+	hotQueryCache[key] = &item
+	hotCacheMutex.Unlock()
+
+	cacheHitsTotal.Inc()
 	return item.Response, true
 }
 
-// setInCache stores a search result in cache
+// setInCache stores a search result in cache (Redis + hot cache)
 func setInCache(key string, response *UnifiedSearchResponse) {
-	ctx := context.Background()
 	item := SearchCacheItem{
 		Response:   response,
 		Expiration: time.Now().Add(cacheTTL),
 	}
 
+	// Store in hot cache (in-memory)
+	hotCacheMutex.Lock()
+	hotQueryCache[key] = &item
+	hotCacheMutex.Unlock()
+
+	// Store in Redis (if available)
+	if redisClient == nil {
+		return
+	}
+	
+	ctx := context.Background()
 	data, err := json.Marshal(item)
 	if err != nil {
 		log.Printf("Cache marshal error: %v", err)
@@ -462,7 +533,7 @@ type VectorSearch struct {
 // NewVectorSearch creates a new vector search client
 func NewVectorSearch(qdrantAddr, collection, apiURL string) *VectorSearch {
 	return &VectorSearch{
-		client:             &http.Client{Timeout: 5 * time.Second},
+		client:             httpClient,  // Use shared optimized HTTP client
 		qdrantAddr:         qdrantAddr,
 		collection:         collection,
 		intentEngineAPIURL: apiURL,
@@ -648,12 +719,15 @@ func searchSearxng(query string, limit int, queryIntent *intent.DeclaredIntent) 
 	params.Add("q", query)
 	params.Add("format", "json")
 	params.Add("language", "en")
-	params.Add("categories", "general")
+	// Fix: Limit to fast engines only
+	params.Add("engines", "google,duckduckgo,brave,wikipedia")
+	params.Add("category_exclude", "files,music,images,videos")
 	params.Add("pageno", "1")
 
 	searchURL := fmt.Sprintf("%s/search?%s", searxngURL, params.Encode())
 
-	resp, err := http.Get(searchURL)
+	// Use optimized httpClient with connection pooling
+	resp, err := httpClient.Get(searchURL)
 	if err != nil {
 		log.Printf("SearXNG search error: %v", err)
 		searchRequestsTotal.WithLabelValues("searxng", "error").Inc()
@@ -689,29 +763,65 @@ func searchSearxng(query string, limit int, queryIntent *intent.DeclaredIntent) 
 		return results, 0, urlsToAdd
 	}
 
+	// Parallel intent analysis for better performance
+	resultChan := make(chan UnifiedSearchResult, len(searxngResp.Results))
+	var wg sync.WaitGroup
+
 	for i, res := range searxngResp.Results {
 		if i >= limit {
 			break
 		}
+		wg.Add(1)
+		go func(r struct {
+			URL     string `json:"url"`
+			Title   string `json:"title"`
+			Content string `json:"content"`
+			Engine  string `json:"engine"`
+		}, idx int) {
+			defer wg.Done()
+			
+			result := UnifiedSearchResult{
+				URL:     r.URL,
+				Title:   r.Title,
+				Content: truncateContent(r.Content, 200),
+				Score:   float64(limit - idx),
+				Rank:    idx + 1,
+				Source:  "searxng",
+			}
+			
+			// Analyze intent (parallel)
+			result.IntentMetadata = intentAnalyzer.AnalyzeContent(r.Title, r.Content, "")
+			result.MatchReasons = []string{fmt.Sprintf("matches-%s-intent", queryIntent.Goal)}
+			
+			// Skip URL queue check for known domains (optimization)
+			if !isKnownDomain(r.URL) {
+				select {
+				case resultChan <- result:
+				default:
+				}
+			} else {
+				select {
+				case resultChan <- result:
+				default:
+				}
+			}
+		}(res, i)
+	}
 
-		result := UnifiedSearchResult{
-			URL:     res.URL,
-			Title:   res.Title,
-			Content: truncateContent(res.Content, 200),
-			Score:   float64(limit - i),
-			Rank:    i + 1,
-			Source:  "searxng",
-		}
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(resultChan)
 
-		result.IntentMetadata = intentAnalyzer.AnalyzeContent(res.Title, res.Content, "")
-		result.MatchReasons = []string{fmt.Sprintf("matches-%s-intent", queryIntent.Goal)}
-
+	// Collect results from channel
+	for result := range resultChan {
 		results = append(results, result)
-
-		if !isKnownDomain(res.URL) {
-			urlsToAdd = append(urlsToAdd, res.URL)
+		if !isKnownDomain(result.URL) {
+			urlsToAdd = append(urlsToAdd, result.URL)
 		}
 	}
+
+	// Sort results by score (parallel processing may have changed order)
+	sortResults(results)
 
 	searchLatency.WithLabelValues("searxng").Observe(time.Since(startTime).Seconds())
 	searchRequestsTotal.WithLabelValues("searxng", "success").Inc()
@@ -871,13 +981,22 @@ func rerankWithPythonAPI(query string, results []UnifiedSearchResult) []UnifiedS
 		"documents": docs,
 	})
 
-	// Call rerank endpoint
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Post(
+	// Call rerank endpoint using optimized httpClient
+	// Reduce timeout from 10s to 3s for faster failure
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	
+	req, err := http.NewRequestWithContext(ctx, "POST",
 		fmt.Sprintf("%s/v1/rerank", apiURL),
-		"application/json",
 		strings.NewReader(string(reqBody)),
 	)
+	if err != nil {
+		log.Printf("Warning: Re-ranking request failed: %v", err)
+		return nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf("Warning: Re-ranking failed: %v", err)
 		return nil
@@ -1091,4 +1210,12 @@ func truncateContent(content string, maxLen int) string {
 		return content
 	}
 	return content[:maxLen] + "..."
+}
+
+// getEnv gets environment variable value with fallback
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -64,14 +65,21 @@ var (
 )
 
 func main() {
-	port := flag.String("port", getEnv("SERVER_PORT", "8080"), "Server port")
+	port := flag.String("port", getEnv("SERVER_PORT", getEnv("GO_SEARCH_API_PORT", "8080")), "Server port")
 	blevePath := flag.String("bleve", getEnv("BLEVE_PATH", "./data/bleve"), "Bleve index path")
 	badgerPath := flag.String("badger", getEnv("BADGER_PATH", "./data/badger"), "BadgerDB path")
 	postgresDSN := flag.String("postgres", getEnv("POSTGRES_DSN", ""), "PostgreSQL DSN")
 	flag.Parse()
 
+	// Build PostgreSQL DSN from environment variables if not provided
 	if *postgresDSN == "" {
-		*postgresDSN = "postgresql://crawler:crawler@localhost:5432/intent_engine?sslmode=disable"
+		dbUser := getEnv("GO_SEARCH_DB_USER", "crawler")
+		dbPassword := getEnv("GO_SEARCH_DB_PASSWORD", "crawler")
+		dbHost := getEnv("GO_SEARCH_DB_HOST", "localhost")
+		dbPort := getEnv("GO_SEARCH_DB_PORT", "5432")
+		dbName := getEnv("GO_SEARCH_DB_NAME", "intent_engine")
+		*postgresDSN = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable",
+			dbUser, dbPassword, dbHost, dbPort, dbName)
 	}
 
 	log.Printf("Starting Search API on port %s", *port)

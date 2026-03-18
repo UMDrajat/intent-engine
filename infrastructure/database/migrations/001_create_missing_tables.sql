@@ -141,7 +141,18 @@ CREATE INDEX IF NOT EXISTS idx_fraud_detection_event_type ON fraud_detection(eve
 CREATE INDEX IF NOT EXISTS idx_ab_tests_status ON ab_tests(status);
 CREATE INDEX IF NOT EXISTS idx_ab_test_variants_test_id ON ab_test_variants(test_id);
 CREATE INDEX IF NOT EXISTS idx_ab_test_assignments_test_id ON ab_test_assignments(test_id);
-CREATE INDEX IF NOT EXISTS idx_ab_test_assignments_user_id ON ab_test_assignments(user_id);
+
+-- Only create user_id index if the column exists
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'ab_test_assignments' 
+        AND column_name = 'user_id'
+    ) THEN
+        CREATE INDEX idx_ab_test_assignments_user_id ON ab_test_assignments(user_id);
+    END IF;
+END $$;
 
 -- Add missing indexes to existing tables
 CREATE INDEX IF NOT EXISTS idx_ads_approval_status ON ads(approval_status, status);

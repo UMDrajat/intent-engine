@@ -2,22 +2,31 @@
 
 BEGIN;
 
--- Drop dependent tables first
+-- Drop dependent tables first (if they exist)
 DROP TABLE IF EXISTS ab_test_assignments CASCADE;
 DROP TABLE IF EXISTS ab_test_variants CASCADE;
 
 -- Add missing columns to ab_tests
-ALTER TABLE ab_tests 
+ALTER TABLE ab_tests
     ADD COLUMN IF NOT EXISTS campaign_id INTEGER NOT NULL,
     ADD COLUMN IF NOT EXISTS traffic_allocation DECIMAL(5,4) DEFAULT 1.0,
     ADD COLUMN IF NOT EXISTS min_sample_size INTEGER DEFAULT 1000,
     ADD COLUMN IF NOT EXISTS confidence_level DECIMAL(5,4) DEFAULT 0.95,
     ADD COLUMN IF NOT EXISTS primary_metric VARCHAR(50) DEFAULT 'ctr';
 
--- Add foreign key constraint
-ALTER TABLE ab_tests 
-    ADD CONSTRAINT ab_tests_campaign_id_fkey 
-    FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE;
+-- Add foreign key constraint (check if it exists first)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'ab_tests_campaign_id_fkey' 
+        AND table_name = 'ab_tests'
+    ) THEN
+        ALTER TABLE ab_tests
+            ADD CONSTRAINT ab_tests_campaign_id_fkey
+            FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- Create index
 CREATE INDEX IF NOT EXISTS idx_ab_tests_campaign_id ON ab_tests(campaign_id);

@@ -125,11 +125,11 @@ class HealthCheckService:
         self.searxng_url = searxng_url or os.getenv("SEARXNG_BASE_URL", "http://searxng:8080")
         self.go_crawler_url = go_crawler_url or os.getenv("GO_CRAWLER_URL", "http://go-crawler:8080")
         self.go_indexer_url = go_indexer_url or os.getenv("GO_INDEXER_URL", "http://go-indexer:8080")
-        self.go_search_api_url = go_search_api_url or os.getenv("GO_SEARCH_API_URL", "http://go-search-api:8080")
+        self.go_search_api_url = go_search_api_url or os.getenv("GO_SEARCH_API_URL", "http://127.0.0.1:8081")
         self.unified_search_url = unified_search_url or os.getenv(
-            "UNIFIED_SEARCH_URL", "http://unified-search-api:8082"
+            "UNIFIED_SEARCH_URL", "http://127.0.0.1:8082"
         )
-        qdrant_host = os.getenv("QDRANT_HOST", "qdrant")
+        qdrant_host = os.getenv("QDRANT_HOST", "127.0.0.1")
         qdrant_port = os.getenv("QDRANT_PORT", "6333")
         self.qdrant_url = qdrant_url or f"http://{qdrant_host}:{qdrant_port}"
 
@@ -349,6 +349,15 @@ class HealthCheckService:
     async def check_go_search_api(self) -> ServiceHealth:
         """Check Go Search API health."""
         start = time.time()
+        
+        # Check if Go services are enabled
+        if os.getenv("ENABLE_GO_SERVICES", "false").lower() != "true":
+            return ServiceHealth(
+                service=ServiceType.GO_SEARCH_API,
+                status=HealthStatus.HEALTHY,
+                details={"status": "not_enabled", "note": "Set ENABLE_GO_SERVICES=true to enable"},
+            )
+        
         try:
             timeout = aiohttp.ClientTimeout(total=5)
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -390,6 +399,15 @@ class HealthCheckService:
     async def check_unified_search(self) -> ServiceHealth:
         """Check Unified Search API health."""
         start = time.time()
+        
+        # Check if Go services are enabled
+        if os.getenv("ENABLE_GO_SERVICES", "false").lower() != "true":
+            return ServiceHealth(
+                service=ServiceType.UNIFIED_SEARCH,
+                status=HealthStatus.HEALTHY,
+                details={"status": "not_enabled", "note": "Set ENABLE_GO_SERVICES=true to enable"},
+            )
+        
         try:
             timeout = aiohttp.ClientTimeout(total=5)
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -430,6 +448,15 @@ class HealthCheckService:
     async def check_qdrant(self) -> ServiceHealth:
         """Check Qdrant vector database health."""
         start = time.time()
+        
+        # Check if Qdrant is enabled
+        if os.getenv("ENABLE_QDRANT", "false").lower() != "true":
+            return ServiceHealth(
+                service=ServiceType.QDRANT,
+                status=HealthStatus.HEALTHY,
+                details={"status": "not_enabled", "note": "Set ENABLE_QDRANT=true to enable"},
+            )
+        
         try:
             timeout = aiohttp.ClientTimeout(total=5)
             async with aiohttp.ClientSession(timeout=timeout) as session:

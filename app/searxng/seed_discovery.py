@@ -186,18 +186,22 @@ class SeedURLDiscovery:
         logger.info(f"Total discovered URLs: {len(unique_urls)}")
         return unique_urls
 
-    async def add_to_crawler(self, urls: list[dict], crawler_api_url: str = "http://go-search-api:8080") -> bool:
+    async def add_to_crawler(self, urls: list[dict], crawler_api_url: str = None) -> bool:
         """
         Add discovered URLs to the Go crawler queue.
 
         Args:
             urls: List of discovered URL dictionaries
-            crawler_api_url: Go crawler API URL
+            crawler_api_url: Go crawler API URL (defaults to GO_SEARCH_API_URL env var)
 
         Returns:
             True if successfully added
         """
+        import os
         import aiohttp
+        
+        # Use environment variable first (for aio container)
+        crawler_api_url = crawler_api_url or os.getenv("GO_SEARCH_API_URL", "http://127.0.0.1:8081")
 
         if not urls:
             return False

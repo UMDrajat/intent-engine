@@ -1,75 +1,117 @@
 # Intent Engine Documentation
 
-> **Comprehensive Documentation Hub** - Find guides, references, and technical docs
-
-**Last Updated:** March 16, 2026 | **Version:** v2.1.1
+Welcome to the Intent Engine documentation hub. This directory contains comprehensive guides, reports, and technical documentation.
 
 ---
 
-## 📁 Documentation Structure
+## 📚 Documentation Categories
 
-| Folder | Contents | Files |
-|--------|----------|-------|
-| [`getting-started/`](getting-started/) | Quick start guides and tutorials | 5 files |
-| [`deployment/`](deployment/) | Production deployment and operations | 6 files |
-| [`architecture/`](architecture/) | System design and architecture | 4 files |
-| [`go-crawler/`](go-crawler/) | Go crawler and indexer docs | 13 files |
-| [`reference/`](reference/) | Technical reference and API docs | 9 files |
-| [`testing/`](testing/) | Testing guides and performance | 3 files |
+### 🚀 Getting Started
 
-**Total:** 40+ documentation files covering all aspects of the Intent Engine.
+- **[README.md](../README.md)** - Main project overview and quick start guide
+- **[INDEX.md](../INDEX.md)** - Project index and navigation
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contribution guidelines
 
 ---
 
-## 🚀 Quick Links
+### 📊 Test Reports
 
-### For New Users
-1. [../README.md](../README.md) - Main project README with quick start
-2. [getting-started/QUICKSTART.md](getting-started/QUICKSTART.md) - Complete installation guide (5 min)
-3. [getting-started/README_PRODUCTION.md](getting-started/README_PRODUCTION.md) - Production setup (3 min)
-4. [getting-started/QUICK_REFERENCE.md](getting-started/QUICK_REFERENCE.md) - Command cheat sheet
-
-### For Developers
-1. [architecture/PROJECT_OVERVIEW.md](architecture/PROJECT_OVERVIEW.md) - System architecture and design
-2. [architecture/PROJECT_STRUCTURE.md](architecture/PROJECT_STRUCTURE.md) - Code organization guide
-3. [architecture/SELF_IMPROVING_LOOP.md](architecture/SELF_IMPROVING_LOOP.md) - Self-improving search loop
-4. [reference/Intent-Engine-Tech-Reference.md](reference/Intent-Engine-Tech-Reference.md) - Technical reference
-
-### For DevOps
-1. [deployment/DEPLOYMENT_CHECKLIST.md](deployment/DEPLOYMENT_CHECKLIST.md) - Production deployment checklist
-2. [deployment/PERFORMANCE_OPTIMIZATION_PLAN.md](deployment/PERFORMANCE_OPTIMIZATION_PLAN.md) - Performance optimization
-3. [deployment/CI_IMPROVEMENTS.md](deployment/CI_IMPROVEMENTS.md) - CI/CD improvements
-4. [deployment/RELEASE_AUTOMATION.md](deployment/RELEASE_AUTOMATION.md) - Release automation
-
-### For Go Crawler Users
-1. [go-crawler/README.md](go-crawler/README.md) - Go crawler overview
-2. [go-crawler/GO_CRAWLER_SETUP_GUIDE.md](go-crawler/GO_CRAWLER_SETUP_GUIDE.md) - Complete setup guide
-3. [go-crawler/QUICKSTART.md](go-crawler/QUICKSTART.md) - Quick start guide
+| Document | Description | Date |
+|----------|-------------|------|
+| **[AIO_FINAL_TEST_REPORT.md](AIO_FINAL_TEST_REPORT.md)** | Complete AIO container test results with automatic crawler | March 19, 2026 |
+| **[FINAL_API_TEST_REPORT.md](FINAL_API_TEST_REPORT.md)** | API endpoint test results (100% passing) | March 19, 2026 |
+| **[BENCHMARK_REPORT_MARCH_19.md](BENCHMARK_REPORT_MARCH_19.md)** | Load testing and performance benchmarks | March 19, 2026 |
+| **[FINAL_TEST_RESULTS.md](FINAL_TEST_RESULTS.md)** | Initial comprehensive test results | March 19, 2026 |
 
 ---
 
-## 📖 Documentation Index
+### 🐛 Bug Fixes & Issues
 
-For a complete index of all documentation, see the root **[../INDEX.md](../INDEX.md)** file with:
-- Complete file listing by category
-- Quick reference guides
-- Common tasks and commands
-- Troubleshooting tips
+| Document | Description | Date |
+|----------|-------------|------|
+| **[BUGFIXES_MARCH_19.md](BUGFIXES_MARCH_19.md)** | Summary of all bug fixes implemented | March 19, 2026 |
+| **[FINDINGS_AND_FIX.md](FINDINGS_AND_FIX.md)** | Root cause analysis and solutions | March 19, 2026 |
+
+---
+
+### ⚡ Performance Optimization
+
+| Document | Description | Date |
+|----------|-------------|------|
+| **[SEARCH_LATENCY_OPTIMIZATION.md](SEARCH_LATENCY_OPTIMIZATION.md)** | Comprehensive latency optimization guide | March 19, 2026 |
+| **[LATENCY_OPTIMIZATION_SUMMARY.md](LATENCY_OPTIMIZATION_SUMMARY.md)** | Implementation summary and results | March 19, 2026 |
+| **[COLD_START_GUIDE.md](COLD_START_GUIDE.md)** | Cold start troubleshooting and solutions | March 19, 2026 |
+
+---
+
+### 🔧 Configuration & Deployment
+
+| Document | Description | Date |
+|----------|-------------|------|
+| **[AIO_OPTIONAL_SERVICES.md](AIO_OPTIONAL_SERVICES.md)** | AIO container optional services configuration | March 19, 2026 |
+
+---
+
+## 📋 Quick Reference
+
+### Key Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check endpoint |
+| `POST /search` | Unified search with intent extraction |
+| `POST /extract-intent` | Extract intent from text |
+| `POST /rank-results` | Rank search results by intent |
+| `POST /recommend-services` | Service recommendations |
+| `POST /match-ads` | Ad matching based on intent |
+
+### Common Commands
+
+```bash
+# Start AIO container
+docker-compose -f infrastructure/compose/docker-compose.aio.yml up -d
+
+# View container logs
+docker logs -f intent-engine-aio
+
+# Check crawler status
+docker exec intent-engine-aio psql -U intent_user -d intent_engine -c "SELECT COUNT(*) FROM crawled_pages;"
+
+# Run test suite
+python test_api_benchmark.py
+```
+
+### Default Ports
+
+| Service | Port |
+|---------|------|
+| API (nginx) | 80 |
+| PostgreSQL | 5432 |
+| Redis | 6379 |
+| SearXNG | 8080 |
+| Go Search API | 8081 |
+| Go Unified Search | 8082 |
+| Qdrant | 6333 |
 
 ---
 
 ## 🔗 External Resources
 
-- **GitHub Repository**: https://github.com/itxLikhith/intent-engine
-- **Issues**: https://github.com/itxLikhith/intent-engine/issues
-- **PyPI Package**: https://pypi.org/project/intent-engine/
-- **FastAPI Documentation**: https://fastapi.tiangolo.com/
-- **SearXNG Documentation**: https://docs.searxng.org/
-- **Docker Documentation**: https://docs.docker.com/
+- [Python Documentation](https://docs.python.org/)
+- [Docker Documentation](https://docs.docker.com/)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [SearXNG Documentation](https://docs.searxng.org/)
 
 ---
 
-**Maintained by:** Intent Engine Team  
-**License:** Intent Engine Community License (IECL) v1.0  
-**Version:** v2.1.1  
-**Last Updated:** March 16, 2026
+## 📞 Support
+
+For issues and questions:
+- **GitHub Issues:** [Create an issue](https://github.com/your-org/intent-engine/issues)
+- **Documentation:** Check this docs directory first
+- **API Reference:** See [README.md](../README.md#api-endpoints)
+
+---
+
+**Last Updated:** March 19, 2026  
+**Documentation Status:** ✅ Complete

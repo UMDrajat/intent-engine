@@ -207,8 +207,10 @@ class ReliableTopicExpander:
         },
     }
 
-    def __init__(self, redis_url: str = "redis://redis:6379"):
-        self.redis_url = redis_url
+    def __init__(self, redis_url: str = None):
+        # Use environment variable first (for aio container), then parameter, then default
+        import os
+        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
         self.redis_client = None
         self.topics_key = "seed_discovery:topics"
         self.query_history_key = "seed_discovery:query_history"

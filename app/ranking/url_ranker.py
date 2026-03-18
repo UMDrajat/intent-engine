@@ -580,12 +580,11 @@ class URLRanker:
         )
 
     async def _analyze_urls_parallel(self, urls: list[str]) -> list[URLResult]:
-        """Analyze URLs in parallel using ProcessPoolExecutor for CPU-bound tasks"""
-        executor = await get_ranking_executor()
-        loop = asyncio.get_running_loop()
-
-        # Run all URL analyses concurrently in the process pool
-        tasks = [loop.run_in_executor(executor, analyze_url_task, url) for url in urls]
+        """Analyze URLs in parallel using asyncio for concurrency with minimal overhead"""
+        # Optimization: Use asyncio.to_thread for each URL to avoid blocking the event loop
+        # and to keep execution concurrent without the heavy overhead of ProcessPoolExecutor.
+        # Pickling/unpickling data for ProcessPool is expensive for these light tasks.
+        tasks = [asyncio.to_thread(analyze_url_task, url) for url in urls]
         analysis_results = await asyncio.gather(*tasks)
 
         results = []

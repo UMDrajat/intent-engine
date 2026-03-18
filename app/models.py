@@ -316,9 +316,22 @@ class IntentExtractionRequest(BaseModel):
 
 
 class RankingRequest(BaseModel):
-    intent: dict[str, Any]  # UniversalIntent as dict (converted from JSON)
-    candidates: list[dict[str, Any]]  # SearchResult equivalent as dict
+    intent: dict[str, Any] | Any  # UniversalIntent as dict or UniversalIntent object
+    candidates: list[dict[str, Any]] | None = None  # SearchResult equivalent as dict
+    results: list[dict[str, Any]] | None = None  # Alias for candidates (backwards compatibility)
     options: dict[str, Any] | None = None
+
+    class Config:
+        # Allow both 'candidates' and 'results' fields
+        extra = 'ignore'
+
+    def get_candidates(self) -> list[dict[str, Any]]:
+        """Get candidates, supporting both 'candidates' and 'results' fields."""
+        if self.candidates is not None:
+            return self.candidates
+        if self.results is not None:
+            return self.results
+        return []
 
 
 class ServiceRecommendationRequest(BaseModel):
