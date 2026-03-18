@@ -445,8 +445,8 @@ class ConsentRecord(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
-        Index("ix_consent_records_user_id", "user_id"),
-        Index("ix_consent_records_consent_type", "consent_type"),
+        Index("ix_consent_records_user_id", "user_id", sqlite_if_not_exists=True),
+        Index("ix_consent_records_consent_type", "consent_type", sqlite_if_not_exists=True),
     )
 
 
@@ -469,9 +469,9 @@ class AuditEvent(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        Index("ix_audit_events_event_type", "event_type"),
-        Index("ix_audit_events_timestamp", "timestamp"),
-        Index("ix_audit_events_user_id", "user_id"),
+        Index("ix_audit_events_event_type", "event_type", sqlite_if_not_exists=True),
+        Index("ix_audit_events_timestamp", "timestamp", sqlite_if_not_exists=True),
+        Index("ix_audit_events_user_id", "user_id", sqlite_if_not_exists=True),
     )
 
 
