@@ -404,6 +404,11 @@ class URLRanker:
         min_privacy_score = options.get("min_privacy_score", 0.0)
         exclude_big_tech = options.get("exclude_big_tech", False)
 
+        # Extract negative preferences from intent
+        negative_preferences = None
+        if request.intent and request.intent.declared and request.intent.declared.negativePreferences:
+            negative_preferences = request.intent.declared.negativePreferences
+
         # Analyze all URLs in parallel
         url_results = await self._analyze_urls_parallel(request.urls)
 
@@ -412,7 +417,9 @@ class URLRanker:
         cache_hit_rate = cache_hits / len(url_results) if url_results else 0
 
         # Filter URLs
-        filtered_results = self._filter_urls(url_results, min_privacy_score, exclude_big_tech)
+        filtered_results = self._filter_urls(
+            url_results, min_privacy_score, exclude_big_tech, negative_preferences
+        )
         filtered_count = len(url_results) - len(filtered_results)
 
         # Calculate relevance scores
@@ -459,7 +466,11 @@ class URLRanker:
         return valid_results
 
     def _filter_urls(
-        self, results: list[URLResult], min_privacy_score: float, exclude_big_tech: bool
+        self,
+        results: list[URLResult],
+        min_privacy_score: float,
+        exclude_big_tech: bool,
+        negative_preferences: list[str] | None = None,
     ) -> list[URLResult]:
         """Filter URLs based on criteria"""
         filtered = []
@@ -473,9 +484,29 @@ class URLRanker:
             if exclude_big_tech and PrivacyDatabase.is_big_tech(result.domain):
                 continue
 
+            # Apply negative preferences (e.g., "no google")
+            if negative_preferences and not self._satisfies_negative_preferences(
+                result, negative_preferences
+            ):
+                continue
+
             filtered.append(result)
 
         return filtered
+
+    def _satisfies_negative_preferences(self, url_result: URLResult, preferences: list[str]) -> bool:
+        """Check if URL satisfies negative preferences like 'no google'"""
+        for pref in preferences:
+            pref_lower = pref.lower().replace("no ", "").replace("not ", "")
+
+            # Check against big tech domains
+            privacy_db = PrivacyDatabase()
+            for big_tech in privacy_db.BIG_TECH_DOMAINS:
+                if big_tech.replace(".com", "").replace(".", " ") in pref_lower:
+                    if big_tech in url_result.domain or url_result.domain.endswith("." + big_tech):
+                        return False
+
+        return True
 
     async def _calculate_relevance_scores(self, results: list[URLResult], query: str) -> None:
         """Calculate semantic relevance scores for all URLs"""
