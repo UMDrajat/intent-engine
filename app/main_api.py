@@ -852,23 +852,23 @@ async def get_ads(db: Session = Depends(lambda: next(db_manager.get_db()))):
 async def get_consent_summary(db: Session = Depends(lambda: next(db_manager.get_db()))):
     """Get consent summary statistics."""
     try:
-        from app.database import ConsentRecord as DbConsentRecord
+        from app.database import UserConsent
         from sqlalchemy import select
 
         # Get total consents
-        total_query = select(func.count()).select_from(DbConsentRecord)
+        total_query = select(func.count()).select_from(UserConsent)
         total_consents = db.execute(total_query).scalar() or 0
 
         # Get granted consents
-        granted_query = select(func.count()).select_from(DbConsentRecord).where(DbConsentRecord.granted == True)
+        granted_query = select(func.count()).select_from(UserConsent).where(UserConsent.granted == True)
         granted_consents = db.execute(granted_query).scalar() or 0
 
         # Get denied consents
-        denied_query = select(func.count()).select_from(DbConsentRecord).where(DbConsentRecord.granted == False)
+        denied_query = select(func.count()).select_from(UserConsent).where(UserConsent.granted == False)
         denied_consents = db.execute(denied_query).scalar() or 0
 
         # Get by type
-        by_type_query = select(DbConsentRecord.consent_type, func.count()).group_by(DbConsentRecord.consent_type)
+        by_type_query = select(UserConsent.consent_type, func.count()).group_by(UserConsent.consent_type)
         by_type_result = db.execute(by_type_query).all()
         by_type = {row[0]: row[1] for row in by_type_result}
 
@@ -892,15 +892,15 @@ async def get_consent_summary(db: Session = Depends(lambda: next(db_manager.get_
 async def get_audit_stats(db: Session = Depends(lambda: next(db_manager.get_db()))):
     """Get audit trail statistics."""
     try:
-        from app.database import AuditEvent as DbAuditEvent
+        from app.database import AuditTrail
         from sqlalchemy import select
 
         # Get total events
-        total_query = select(func.count()).select_from(DbAuditEvent)
+        total_query = select(func.count()).select_from(AuditTrail)
         total_events = db.execute(total_query).scalar() or 0
 
         # Get events by type
-        by_type_query = select(DbAuditEvent.event_type, func.count()).group_by(DbAuditEvent.event_type)
+        by_type_query = select(AuditTrail.event_type, func.count()).group_by(AuditTrail.event_type)
         by_type_result = db.execute(by_type_query).all()
         events_by_type = {row[0]: row[1] for row in by_type_result}
 
@@ -908,15 +908,15 @@ async def get_audit_stats(db: Session = Depends(lambda: next(db_manager.get_db()
         from datetime import timedelta
         seven_days_ago = datetime.now(UTC) - timedelta(days=7)
         daily_query = select(
-            func.date(DbAuditEvent.timestamp).label('date'),
+            func.date(AuditTrail.timestamp).label('date'),
             func.count()
-        ).where(DbAuditEvent.timestamp >= seven_days_ago).group_by(func.date(DbAuditEvent.timestamp))
+        ).where(AuditTrail.timestamp >= seven_days_ago).group_by(func.date(AuditTrail.timestamp))
         daily_result = db.execute(daily_query).all()
         daily_counts = [{"date": str(row[0]), "count": row[1]} for row in daily_result]
 
         # Get recent activity count (last 24 hours)
         twenty_four_hours_ago = datetime.now(UTC) - timedelta(hours=24)
-        recent_query = select(func.count()).select_from(DbAuditEvent).where(DbAuditEvent.timestamp >= twenty_four_hours_ago)
+        recent_query = select(func.count()).select_from(AuditTrail).where(AuditTrail.timestamp >= twenty_four_hours_ago)
         recent_activity = db.execute(recent_query).scalar() or 0
 
         return AuditStats(

@@ -429,39 +429,50 @@ class ABTestAssignment(Base):
     )
 
 
-class ConsentRecord(Base):
+class UserConsent(Base):
     """
-    Consent record for tracking user consent
+    User consent for tracking user consent (matches user_consents table in init script)
     """
-    __tablename__ = "consent_records"
+    __tablename__ = "user_consents"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, nullable=True)
+    user_id = Column(String, nullable=False, index=True)
     consent_type = Column(String, nullable=False, index=True)
     granted = Column(Boolean, nullable=False, index=True)
     consent_details = Column(JSON, nullable=True)
-    expires_at = Column(DateTime, nullable=True)
+    granted_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    withdrawn_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_user_consents_user_id_consent_type", "user_id", "consent_type"),
+    )
 
 
-class AuditEvent(Base):
+class AuditTrail(Base):
     """
-    Audit event for tracking system events
+    Audit trail for tracking system events (matches audit_trails table in init script)
     """
-    __tablename__ = "audit_events"
+    __tablename__ = "audit_trails"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=True)
     event_type = Column(String, nullable=False, index=True)
     resource_type = Column(String, nullable=True)
     resource_id = Column(Integer, nullable=True)
-    action_description = Column(String, nullable=True)
+    action_description = Column(Text, nullable=True)
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
     payload = Column(JSON, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_audit_trails_event_type", "event_type"),
+        Index("ix_audit_trails_resource_type_id", "resource_type", "resource_id"),
+    )
 
 
 # Create tables if they don't exist
