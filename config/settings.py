@@ -6,18 +6,17 @@ with validation, type safety, and environment variable management.
 
 Usage:
     from config.settings import settings
-    
+
     # Access settings
     db_url = settings.database_url
     secret_key = settings.secret_key
-    
+
     # Validate at startup
     settings.validate_production()
 """
 
-import secrets
 from functools import lru_cache
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -44,15 +43,9 @@ class DatabaseSettings(BaseSettings):
 
     # Connection pool settings
     pool_size: int = Field(default=10, ge=1, le=100, description="Connection pool size")
-    max_overflow: int = Field(
-        default=20, ge=0, le=100, description="Max overflow connections"
-    )
-    pool_timeout: int = Field(
-        default=30, ge=1, le=300, description="Pool timeout (seconds)"
-    )
-    pool_recycle: int = Field(
-        default=1800, ge=60, le=7200, description="Pool recycle time (seconds)"
-    )
+    max_overflow: int = Field(default=20, ge=0, le=100, description="Max overflow connections")
+    pool_timeout: int = Field(default=30, ge=1, le=300, description="Pool timeout (seconds)")
+    pool_recycle: int = Field(default=1800, ge=60, le=7200, description="Pool recycle time (seconds)")
 
     # Full connection URL (overrides individual params if set)
     url: str | None = Field(
@@ -61,9 +54,7 @@ class DatabaseSettings(BaseSettings):
     )
 
     # PgBouncer settings
-    pgbouncer_enabled: bool = Field(
-        default=False, description="Enable PgBouncer connection pooling"
-    )
+    pgbouncer_enabled: bool = Field(default=False, description="Enable PgBouncer connection pooling")
     pgbouncer_host: str = Field(default="localhost", description="PgBouncer host")
     pgbouncer_port: int = Field(default=6543, description="PgBouncer port")
 
@@ -90,15 +81,15 @@ class DatabaseSettings(BaseSettings):
 
         env = os.getenv("ENVIRONMENT", "development")
         if env == "production":
-            if v in ("change_this_password_in_production", "password", "admin", "intent_secure_password_change_in_prod"):
-                raise ValueError(
-                    "Weak database password detected. "
-                    "Please use a strong, unique password in production."
-                )
+            if v in (
+                "change_this_password_in_production",
+                "password",
+                "admin",
+                "intent_secure_password_change_in_prod",
+            ):
+                raise ValueError("Weak database password detected. Please use a strong, unique password in production.")
             if len(v) < 12:
-                raise ValueError(
-                    "Database password must be at least 12 characters in production."
-                )
+                raise ValueError("Database password must be at least 12 characters in production.")
         return v
 
 
@@ -116,17 +107,11 @@ class RedisSettings(BaseSettings):
     port: int = Field(default=6379, description="Redis port")
     db: int = Field(default=0, ge=0, le=15, description="Redis database number")
     password: str | None = Field(default=None, description="Redis password")
-    url: str | None = Field(
-        default=None, description="Full Redis URL (overrides individual settings)"
-    )
+    url: str | None = Field(default=None, description="Full Redis URL (overrides individual settings)")
 
     # Connection pool settings
-    max_connections: int = Field(
-        default=50, ge=1, le=500, description="Max Redis connections"
-    )
-    timeout: float = Field(
-        default=5.0, ge=0.1, le=60.0, description="Connection timeout (seconds)"
-    )
+    max_connections: int = Field(default=50, ge=1, le=500, description="Max Redis connections")
+    timeout: float = Field(default=5.0, ge=0.1, le=60.0, description="Connection timeout (seconds)")
 
     # SSL/TLS settings
     ssl: bool = Field(default=False, description="Enable SSL/TLS for Redis")
@@ -169,12 +154,8 @@ class SecuritySettings(BaseSettings):
         description="Application secret key for JWT signing",
     )
     algorithm: str = Field(default="HS256", description="JWT algorithm")
-    access_token_expire_minutes: int = Field(
-        default=30, ge=1, le=1440, description="Access token expiry (minutes)"
-    )
-    refresh_token_expire_days: int = Field(
-        default=7, ge=1, le=365, description="Refresh token expiry (days)"
-    )
+    access_token_expire_minutes: int = Field(default=30, ge=1, le=1440, description="Access token expiry (minutes)")
+    refresh_token_expire_days: int = Field(default=7, ge=1, le=365, description="Refresh token expiry (days)")
 
     # CORS settings
     enable_cors: bool = Field(default=True, description="Enable CORS")
@@ -182,9 +163,7 @@ class SecuritySettings(BaseSettings):
         default="http://localhost:3000,http://localhost:8080",
         description="Allowed CORS origins (comma-separated)",
     )
-    cors_allow_credentials: bool = Field(
-        default=True, description="Allow CORS credentials"
-    )
+    cors_allow_credentials: bool = Field(default=True, description="Allow CORS credentials")
     cors_allow_methods: str = Field(
         default="GET,POST,PUT,DELETE,OPTIONS",
         description="Allowed CORS methods",
@@ -196,9 +175,7 @@ class SecuritySettings(BaseSettings):
 
     # Rate limiting
     rate_limit_enabled: bool = Field(default=True, description="Enable rate limiting")
-    rate_limit_default: str = Field(
-        default="100/minute", description="Default rate limit"
-    )
+    rate_limit_default: str = Field(default="100/minute", description="Default rate limit")
     rate_limit_strict: str = Field(default="10/minute", description="Strict rate limit")
     rate_limit_storage_url: str = Field(
         default="memory://",
@@ -223,9 +200,7 @@ class SecuritySettings(BaseSettings):
                     "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
                 )
             if len(v) < 32:
-                raise ValueError(
-                    "SECRET_KEY must be at least 32 characters in production."
-                )
+                raise ValueError("SECRET_KEY must be at least 32 characters in production.")
         return v
 
     @property
@@ -275,9 +250,7 @@ class SearXNGSettings(BaseSettings):
         if os.getenv("ENVIRONMENT") == "production":
             if v in ("generate-with-openssl-rand-hex-32", "ultrasecret"):
                 raise ValueError(
-                    "Default SEARXNG_SECRET_KEY detected. "
-                    "Generate a secure random key: "
-                    "openssl rand -hex 32"
+                    "Default SEARXNG_SECRET_KEY detected. Generate a secure random key: openssl rand -hex 32"
                 )
         return v
 
@@ -291,21 +264,11 @@ class MLSettings(BaseSettings):
         extra="ignore",
     )
 
-    model_cache_dir: str = Field(
-        default="./model_cache", description="Model cache directory"
-    )
-    sentence_transformers_model: str = Field(
-        default="all-MiniLM-L6-v2", description="Sentence transformers model"
-    )
-    device: Literal["cpu", "cuda", "mps"] = Field(
-        default="cpu", description="ML device (cpu, cuda, mps)"
-    )
-    transformers_cache: str = Field(
-        default="./transformers_cache", description="Transformers cache directory"
-    )
-    hugging_face_token: str | None = Field(
-        default=None, description="Hugging Face API token"
-    )
+    model_cache_dir: str = Field(default="./model_cache", description="Model cache directory")
+    sentence_transformers_model: str = Field(default="all-MiniLM-L6-v2", description="Sentence transformers model")
+    device: Literal["cpu", "cuda", "mps"] = Field(default="cpu", description="ML device (cpu, cuda, mps)")
+    transformers_cache: str = Field(default="./transformers_cache", description="Transformers cache directory")
+    hugging_face_token: str | None = Field(default=None, description="Hugging Face API token")
 
 
 class PrivacySettings(BaseSettings):
@@ -318,26 +281,16 @@ class PrivacySettings(BaseSettings):
     )
 
     # Data retention (hours)
-    session_data_retention_hours: int = Field(
-        default=8, ge=1, le=720, description="Session data retention (hours)"
-    )
-    analytics_data_retention_days: int = Field(
-        default=90, ge=1, le=730, description="Analytics data retention (days)"
-    )
-    audit_log_retention_days: int = Field(
-        default=365, ge=30, le=2555, description="Audit log retention (days)"
-    )
+    session_data_retention_hours: int = Field(default=8, ge=1, le=720, description="Session data retention (hours)")
+    analytics_data_retention_days: int = Field(default=90, ge=1, le=730, description="Analytics data retention (days)")
+    audit_log_retention_days: int = Field(default=365, ge=30, le=2555, description="Audit log retention (days)")
 
     # Consent management
     consent_required: bool = Field(default=True, description="Require user consent")
-    consent_expiry_days: int = Field(
-        default=365, ge=1, le=730, description="Consent expiry (days)"
-    )
+    consent_expiry_days: int = Field(default=365, ge=1, le=730, description="Consent expiry (days)")
 
     # Anonymization
-    enable_anonymization: bool = Field(
-        default=True, description="Enable data anonymization"
-    )
+    enable_anonymization: bool = Field(default=True, description="Enable data anonymization")
     anonymization_salt: str = Field(
         default="generate-random-salt-for-anonymization",
         description="Salt for anonymization",
@@ -351,10 +304,7 @@ class PrivacySettings(BaseSettings):
 
         if os.getenv("ENVIRONMENT") == "production":
             if v in ("generate-random-salt-for-anonymization", "salt"):
-                raise ValueError(
-                    "Default ANONYMIZATION_SALT detected. "
-                    "Generate a random salt for production."
-                )
+                raise ValueError("Default ANONYMIZATION_SALT detected. Generate a random salt for production.")
         return v
 
 
@@ -380,21 +330,13 @@ class MonitoringSettings(BaseSettings):
     )
 
     # Health checks
-    health_check_interval: int = Field(
-        default=30, ge=5, le=300, description="Health check interval (seconds)"
-    )
-    health_check_timeout: int = Field(
-        default=10, ge=1, le=60, description="Health check timeout (seconds)"
-    )
+    health_check_interval: int = Field(default=30, ge=5, le=300, description="Health check interval (seconds)")
+    health_check_timeout: int = Field(default=10, ge=1, le=60, description="Health check timeout (seconds)")
 
     # Distributed tracing
     tracing_enabled: bool = Field(default=False, description="Enable distributed tracing")
-    tracing_endpoint: str = Field(
-        default="http://localhost:4317", description="Tracing endpoint"
-    )
-    tracing_service_name: str = Field(
-        default="intent-engine", description="Tracing service name"
-    )
+    tracing_endpoint: str = Field(default="http://localhost:4317", description="Tracing endpoint")
+    tracing_service_name: str = Field(default="intent-engine", description="Tracing service name")
 
 
 class ApplicationSettings(BaseSettings):
@@ -422,9 +364,7 @@ class ApplicationSettings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO", description="Logging level"
     )
-    log_format: Literal["json", "console"] = Field(
-        default="console", description="Log format"
-    )
+    log_format: Literal["json", "console"] = Field(default="console", description="Log format")
 
     # Development
     reload: bool = Field(default=False, description="Enable hot reload (dev only)")
@@ -432,16 +372,10 @@ class ApplicationSettings(BaseSettings):
     ssl_verify: bool = Field(default=True, description="Enable SSL verification")
 
     # Feature flags
-    feature_new_ranking_algorithm: bool = Field(
-        default=False, description="Enable new ranking algorithm"
-    )
-    feature_advanced_fraud_detection: bool = Field(
-        default=True, description="Enable advanced fraud detection"
-    )
+    feature_new_ranking_algorithm: bool = Field(default=False, description="Enable new ranking algorithm")
+    feature_advanced_fraud_detection: bool = Field(default=True, description="Enable advanced fraud detection")
     feature_ab_testing: bool = Field(default=True, description="Enable A/B testing")
-    feature_real_time_analytics: bool = Field(
-        default=True, description="Enable real-time analytics"
-    )
+    feature_real_time_analytics: bool = Field(default=True, description="Enable real-time analytics")
 
     @model_validator(mode="after")
     def validate_environment_config(self) -> "ApplicationSettings":
@@ -510,17 +444,13 @@ class Settings(BaseSettings):
         # Check rate limiting storage
         if self.security.rate_limit_storage_url == "memory://":
             errors.append(
-                "RATE_LIMIT_STORAGE_URL should use Redis in production "
-                "(memory:// doesn't work across multiple workers)"
+                "RATE_LIMIT_STORAGE_URL should use Redis in production (memory:// doesn't work across multiple workers)"
             )
 
         # Check Redis configuration
         if self.redis.enabled and self.app.environment == "production":
             if "localhost" in self.redis.host:
-                errors.append(
-                    "Redis host should not be localhost in production "
-                    "(use a dedicated Redis instance)"
-                )
+                errors.append("Redis host should not be localhost in production (use a dedicated Redis instance)")
 
         return errors
 
@@ -556,9 +486,7 @@ class Settings(BaseSettings):
         # Validate database connection
         if "change_this_password" in self.database.password:
             if self.app.environment == "production":
-                errors.append(
-                    "CRITICAL: DATABASE_PASSWORD must be changed in production"
-                )
+                errors.append("CRITICAL: DATABASE_PASSWORD must be changed in production")
 
         if errors:
             raise ValueError("\n".join(errors))

@@ -218,7 +218,7 @@ class SeedURLDiscovery:
 
                 # Try both common endpoints
                 endpoints = ["/api/v1/crawl/seed", "/api/v1/add-urls"]
-                
+
                 success = False
                 for endpoint in endpoints:
                     try:
@@ -232,7 +232,7 @@ class SeedURLDiscovery:
                     except Exception as e:
                         logger.debug(f"Failed to add URLs via {endpoint}: {e}")
                         continue
-                
+
                 return success
 
         except Exception as e:

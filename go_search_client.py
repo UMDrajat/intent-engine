@@ -145,18 +145,13 @@ class GoSearchClient:
 
         try:
             session = await self._get_session()
-            
+
             # Use "urls" as the primary field name, but include "seed_urls" for compatibility
-            payload = {
-                "urls": urls,
-                "seed_urls": urls,
-                "priority": priority,
-                "depth": depth
-            }
+            payload = {"urls": urls, "seed_urls": urls, "priority": priority, "depth": depth}
 
             # Try /api/v1/crawl/seed first (standard), then fallback to /api/v1/add-urls
             endpoints = ["/api/v1/crawl/seed", "/api/v1/add-urls"]
-            
+
             for endpoint in endpoints:
                 try:
                     async with session.post(f"{self.base_url}{endpoint}", json=payload) as response:
@@ -166,7 +161,7 @@ class GoSearchClient:
                 except Exception as e:
                     logger.debug(f"Failed to add URLs via {endpoint}: {e}")
                     continue
-            
+
             return False
         except Exception as e:
             logger.error(f"Add seed URLs error: {e}")

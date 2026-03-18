@@ -21,7 +21,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
-from sqlalchemy import func, text
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ads.matcher import match_ads
@@ -621,18 +621,25 @@ async def health_check(db: Session = Depends(get_db)):
 
     # Build checks dict for backward compatibility
     checks = {
-        "database": system_health.services.get("database", {}).status == "healthy" if hasattr(system_health.services.get("database", {}), "status") else True,
-        "redis": system_health.services.get("redis", {}).status == "healthy" if hasattr(system_health.services.get("redis", {}), "status") else True,
-        "searxng": system_health.services.get("searxng", {}).status == "healthy" if hasattr(system_health.services.get("searxng", {}), "status") else True,
-        "models_loaded": system_health.services.get("models", {}).status == "healthy" if hasattr(system_health.services.get("models", {}), "status") else True,
+        "database": system_health.services.get("database", {}).status == "healthy"
+        if hasattr(system_health.services.get("database", {}), "status")
+        else True,
+        "redis": system_health.services.get("redis", {}).status == "healthy"
+        if hasattr(system_health.services.get("redis", {}), "status")
+        else True,
+        "searxng": system_health.services.get("searxng", {}).status == "healthy"
+        if hasattr(system_health.services.get("searxng", {}), "status")
+        else True,
+        "models_loaded": system_health.services.get("models", {}).status == "healthy"
+        if hasattr(system_health.services.get("models", {}), "status")
+        else True,
     }
 
     # Log detailed health status
     for service_name, service_health in system_health.services.items():
         if service_health.status != "healthy":
             logger.warning(
-                f"Health check [{service_name.value}]: {service_health.status} "
-                f"- {service_health.error or 'OK'}"
+                f"Health check [{service_name.value}]: {service_health.status} - {service_health.error or 'OK'}"
             )
 
     return HealthCheckResponse(
@@ -673,8 +680,9 @@ async def readiness_probe():
 
     This endpoint is designed for load balancer health checks.
     """
-    from config.health_checks import health_checker
     from fastapi.responses import JSONResponse
+
+    from config.health_checks import health_checker
 
     is_ready = await health_checker.check_readiness()
 
@@ -705,8 +713,9 @@ async def liveness_probe():
     This endpoint is designed for container orchestrators to detect
     when a container needs to be restarted.
     """
-    from config.health_checks import health_checker
     from fastapi.responses import JSONResponse
+
+    from config.health_checks import health_checker
 
     is_alive = await health_checker.check_liveness()
 

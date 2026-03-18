@@ -6,7 +6,7 @@ with proper readiness and liveness probes.
 
 Usage:
     from config.health_checks import HealthCheckService
-    
+
     checker = HealthCheckService()
     status = await checker.check_all()
 """
@@ -16,7 +16,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import aiohttp
@@ -24,7 +24,7 @@ import aiohttp
 logger = logging.getLogger(__name__)
 
 
-class HealthStatus(str, Enum):
+class HealthStatus(StrEnum):
     """Health status levels."""
 
     HEALTHY = "healthy"
@@ -32,7 +32,7 @@ class HealthStatus(str, Enum):
     UNHEALTHY = "unhealthy"
 
 
-class ServiceType(str, Enum):
+class ServiceType(StrEnum):
     """Service types for health checks."""
 
     DATABASE = "database"
@@ -86,10 +86,7 @@ class SystemHealth:
         return {
             "status": self.status.value,
             "timestamp": self.timestamp.isoformat(),
-            "services": {
-                service.value: health.to_dict()
-                for service, health in self.services.items()
-            },
+            "services": {service.value: health.to_dict() for service, health in self.services.items()},
             "version": self.version,
             "environment": self.environment,
             "uptime_seconds": self.uptime_seconds,
@@ -125,18 +122,10 @@ class HealthCheckService:
 
         self.database_url = database_url or os.getenv("DATABASE_URL")
         self.redis_url = redis_url or os.getenv("REDIS_URL")
-        self.searxng_url = searxng_url or os.getenv(
-            "SEARXNG_BASE_URL", "http://searxng:8080"
-        )
-        self.go_crawler_url = go_crawler_url or os.getenv(
-            "GO_CRAWLER_URL", "http://go-crawler:8080"
-        )
-        self.go_indexer_url = go_indexer_url or os.getenv(
-            "GO_INDEXER_URL", "http://go-indexer:8080"
-        )
-        self.go_search_api_url = go_search_api_url or os.getenv(
-            "GO_SEARCH_API_URL", "http://go-search-api:8080"
-        )
+        self.searxng_url = searxng_url or os.getenv("SEARXNG_BASE_URL", "http://searxng:8080")
+        self.go_crawler_url = go_crawler_url or os.getenv("GO_CRAWLER_URL", "http://go-crawler:8080")
+        self.go_indexer_url = go_indexer_url or os.getenv("GO_INDEXER_URL", "http://go-indexer:8080")
+        self.go_search_api_url = go_search_api_url or os.getenv("GO_SEARCH_API_URL", "http://go-search-api:8080")
         self.unified_search_url = unified_search_url or os.getenv(
             "UNIFIED_SEARCH_URL", "http://unified-search-api:8082"
         )
@@ -170,18 +159,18 @@ class HealthCheckService:
             # Run synchronous database check in a thread to avoid blocking
             def _check():
                 from sqlalchemy import create_engine, text
-                
+
                 # Use a very short timeout for health checks
                 # If it's a postgres URL, ensure we don't try to use asyncpg here
                 url = self.database_url
                 if url.startswith("postgresql+asyncpg://"):
                     url = url.replace("postgresql+asyncpg://", "postgresql://")
-                
+
                 # connect_timeout is supported by psycopg2 but not sqlite3
                 connect_args = {}
                 if "postgresql" in url:
                     connect_args["connect_timeout"] = 5
-                
+
                 engine = create_engine(url, connect_args=connect_args)
                 with engine.connect() as conn:
                     conn.execute(text("SELECT 1"))
@@ -222,11 +211,11 @@ class HealthCheckService:
 
             client = redis.from_url(self.redis_url, socket_timeout=5)
             await client.ping()
-            
+
             # Get Redis info
             info = await client.info("server")
             redis_version = info.get("redis_version", "unknown")
-            
+
             response_time = (time.time() - start) * 1000
             await client.close()
 
@@ -265,7 +254,7 @@ class HealthCheckService:
                     if response.status == 200:
                         content_type = response.headers.get("Content-Type", "")
                         details = {"url": url, "content_type": content_type}
-                        
+
                         if "application/json" in content_type:
                             try:
                                 details["response"] = await response.json()
@@ -298,7 +287,7 @@ class HealthCheckService:
 
                         raise Exception(f"Status {response.status}")
 
-        except (asyncio.TimeoutError, aiohttp.ClientConnectorError) as e:
+        except (TimeoutError, aiohttp.ClientConnectorError) as e:
             response_time = (time.time() - start) * 1000
             logger.warning(f"SearXNG health check failed (Connection Error): {e}")
             return ServiceHealth(
@@ -335,7 +324,7 @@ class HealthCheckService:
             details={
                 "type": "background_worker",
                 "note": "No HTTP endpoint (worker-only process)",
-                "url": self.go_crawler_url
+                "url": self.go_crawler_url,
             },
         )
 
@@ -351,10 +340,9 @@ class HealthCheckService:
             details={
                 "type": "background_worker",
                 "note": "No HTTP endpoint (worker-only process)",
-                "url": self.go_indexer_url
+                "url": self.go_indexer_url,
             },
         )
-
 
     async def check_go_search_api(self) -> ServiceHealth:
         """Check Go Search API health."""
@@ -377,9 +365,9 @@ class HealthCheckService:
                     else:
                         raise Exception(f"Status {response.status}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             response_time = (time.time() - start) * 1000
-            logger.warning(f"Go Search API health check timeout")
+            logger.warning("Go Search API health check timeout")
             return ServiceHealth(
                 service=ServiceType.GO_SEARCH_API,
                 status=HealthStatus.UNHEALTHY,
@@ -417,9 +405,9 @@ class HealthCheckService:
                     else:
                         raise Exception(f"Status {response.status}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             response_time = (time.time() - start) * 1000
-            logger.warning(f"Unified Search health check timeout")
+            logger.warning("Unified Search health check timeout")
             return ServiceHealth(
                 service=ServiceType.UNIFIED_SEARCH,
                 status=HealthStatus.UNHEALTHY,
@@ -468,9 +456,9 @@ class HealthCheckService:
 
                         raise Exception(f"Status {response.status}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             response_time = (time.time() - start) * 1000
-            logger.warning(f"Qdrant health check timeout")
+            logger.warning("Qdrant health check timeout")
             return ServiceHealth(
                 service=ServiceType.QDRANT,
                 status=HealthStatus.UNHEALTHY,
@@ -554,14 +542,16 @@ class HealthCheckService:
         ]
 
         if include_optional:
-            tasks.extend([
-                self.check_searxng(),
-                self.check_go_crawler(),
-                self.check_go_indexer(),
-                self.check_go_search_api(),
-                self.check_unified_search(),
-                self.check_qdrant(),
-            ])
+            tasks.extend(
+                [
+                    self.check_searxng(),
+                    self.check_go_crawler(),
+                    self.check_go_indexer(),
+                    self.check_go_search_api(),
+                    self.check_unified_search(),
+                    self.check_qdrant(),
+                ]
+            )
 
         # Models check is synchronous
         tasks.append(asyncio.get_event_loop().run_in_executor(None, self.check_models))
@@ -584,12 +574,8 @@ class HealthCheckService:
             services[ServiceType.MODELS] = self.check_models()
 
         # Determine overall status
-        unhealthy_count = sum(
-            1 for s in services.values() if s.status == HealthStatus.UNHEALTHY
-        )
-        degraded_count = sum(
-            1 for s in services.values() if s.status == HealthStatus.DEGRADED
-        )
+        unhealthy_count = sum(1 for s in services.values() if s.status == HealthStatus.UNHEALTHY)
+        degraded_count = sum(1 for s in services.values() if s.status == HealthStatus.DEGRADED)
 
         if unhealthy_count > 0:
             overall_status = HealthStatus.UNHEALTHY
@@ -601,6 +587,7 @@ class HealthCheckService:
         # Get version
         try:
             from __version__ import __version__
+
             version = __version__
         except ImportError:
             version = "unknown"

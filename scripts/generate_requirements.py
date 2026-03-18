@@ -113,7 +113,7 @@ def generate_requirements_files():
     if optional_dependencies:
         print("\n📦 Optional dependency groups:")
         for group, deps in optional_dependencies.items():
-            count = len([d for d in deps if not d.strip().startswith('#')])
+            count = len([d for d in deps if not d.strip().startswith("#")])
             print(f"  - {group}: {count} packages")
 
 
