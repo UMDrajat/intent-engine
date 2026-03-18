@@ -170,7 +170,6 @@ def seed_data():
         # Create ads
         ads = [
             Ad(
-                approval_status="approved",
                 advertiser_id=advertisers[0].id,
                 ad_group_id=ad_groups[0].id,
                 title="Best Programming Laptops 2026",
@@ -185,7 +184,6 @@ def seed_data():
                 approval_status="approved",
             ),
             Ad(
-                approval_status="approved",
                 advertiser_id=advertisers[0].id,
                 ad_group_id=ad_groups[1].id,
                 title="Budget Laptops Under ₹30,000",
@@ -200,7 +198,6 @@ def seed_data():
                 approval_status="approved",
             ),
             Ad(
-                approval_status="approved",
                 advertiser_id=advertisers[1].id,
                 ad_group_id=ad_groups[2].id,
                 title="Secure VPN - No Logs Policy",
@@ -215,7 +212,6 @@ def seed_data():
                 approval_status="approved",
             ),
             Ad(
-                approval_status="approved",
                 advertiser_id=advertisers[2].id,
                 ad_group_id=ad_groups[3].id,
                 title="Eco-Friendly Home Products",
@@ -230,7 +226,6 @@ def seed_data():
                 approval_status="approved",
             ),
             Ad(
-                approval_status="approved",
                 advertiser_id=advertisers[3].id,
                 ad_group_id=ad_groups[4].id,
                 title="Open Source Dev Tools",
