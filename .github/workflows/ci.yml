@@ -175,6 +175,8 @@ jobs:
             --ignore=app/tests/comprehensive_test.py \
             --ignore=app/tests/api_integration_test.py \
             --ignore=app/tests/test_advertising_api.py \
+            --ignore=app/tests/test_complete_workflow.py \
+            --ignore=app/tests/test_url_ranking_api.py \
             app/tests/
 
       - name: Upload coverage to Codecov
@@ -272,6 +274,7 @@ jobs:
           python app/tests/api_integration_test.py
           # Only run workflow test if it exists
           if [ -f "app/tests/test_complete_workflow.py" ]; then python app/tests/test_complete_workflow.py; fi
+          if [ -f "app/tests/test_url_ranking_api.py" ]; then python app/tests/test_url_ranking_api.py || pytest app/tests/test_url_ranking_api.py -v --no-cov; fi
 
       - name: Show logs on failure
         if: failure()
