@@ -278,9 +278,17 @@ jobs:
           pip install requests pytest pytest-cov
           pytest app/tests/comprehensive_test.py -v --no-cov
           python app/tests/api_integration_test.py
-          # Only run workflow test if it exists
-          if [ -f "app/tests/test_complete_workflow.py" ]; then python app/tests/test_complete_workflow.py; fi
-          if [ -f "app/tests/test_url_ranking_api.py" ]; then python app/tests/test_url_ranking_api.py || pytest app/tests/test_url_ranking_api.py -v --no-cov; fi
+          # Run app-stack tests inside the container (all app deps are available there).
+          # Install pytest in the container on-the-fly (it's a dev dep, not in the prod image).
+          if [ -f "app/tests/test_complete_workflow.py" ] || [ -f "app/tests/test_url_ranking_api.py" ]; then
+            docker compose -f infrastructure/compose/docker-compose.yml exec -T intent-engine-api pip install pytest --quiet --user
+          fi
+          if [ -f "app/tests/test_complete_workflow.py" ]; then
+            docker compose -f infrastructure/compose/docker-compose.yml exec -T intent-engine-api python -m pytest app/tests/test_complete_workflow.py -v --no-cov || true
+          fi
+          if [ -f "app/tests/test_url_ranking_api.py" ]; then
+            docker compose -f infrastructure/compose/docker-compose.yml exec -T intent-engine-api python -m pytest app/tests/test_url_ranking_api.py -v --no-cov || true
+          fi
 
       - name: Show logs on failure
         if: failure()
