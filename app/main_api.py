@@ -408,8 +408,9 @@ async def api_extract_intent(request: Request, extraction_request: IntentExtract
     Extract structured intent from a natural language query.
     """
     try:
-        intent = extract_intent(extraction_request.query)
-        return intent
+        result = extract_intent(extraction_request)
+        # Return the intent from the response
+        return result.intent
     except Exception as e:
         logger.error(f"Intent extraction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -729,8 +730,8 @@ async def get_creative(creative_id: int, db: Session = Depends(lambda: next(db_m
 async def get_campaign_performance(db: Session = Depends(lambda: next(db_manager.get_db()))):
     """Get campaign performance reports."""
     try:
-        from app.analytics.advanced import AnalyticsEngine
-        analytics = AnalyticsEngine(db)
+        from app.analytics.advanced import AdvancedAnalytics
+        analytics = AdvancedAnalytics(db)
         
         # Get all campaigns with their performance
         campaigns = db.query(DbCampaign).all()
