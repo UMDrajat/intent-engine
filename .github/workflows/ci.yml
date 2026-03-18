@@ -257,7 +257,13 @@ jobs:
       # Note: Using CI override to exclude flaky Go services
       - name: Start services
         run: |
-          docker compose -f infrastructure/compose/docker-compose.yml -f infrastructure/compose/docker-compose.ci.yml up -d --wait --wait-timeout 300
+          docker compose -f infrastructure/compose/docker-compose.yml -f infrastructure/compose/docker-compose.ci.yml up -d --wait --wait-timeout 300 || (
+            echo "=== docker compose --wait FAILED – dumping API logs ===";
+            docker compose -f infrastructure/compose/docker-compose.yml logs intent-engine-api --tail=150;
+            echo "=== Container status ===";
+            docker compose -f infrastructure/compose/docker-compose.yml ps -a;
+            exit 1
+          )
           echo "All services (API, Worker, DB) are healthy."
           docker compose -f infrastructure/compose/docker-compose.yml ps
 

@@ -8,11 +8,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String
 from sqlalchemy.orm import Session
 
-# Define Base here to avoid circular import
-from app.database import Base
+# Import UserConsent from the canonical database module to avoid MetaData conflicts.
+# (Defining it here too would cause a duplicate-table crash at import time,
+#  because importing Base triggers database.py which registers the table first.)
+from app.database import UserConsent  # noqa: F401  (re-exported for callers)
 
 
 class ConsentType(Enum):
@@ -32,23 +33,6 @@ class ConsentStatus(Enum):
     DENIED = "denied"
     WITHDRAWN = "withdrawn"
     EXPIRED = "expired"
-
-
-class UserConsent(Base):
-    """User consent records table"""
-
-    __tablename__ = "user_consents"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, nullable=False)  # Could be hashed user ID or session ID
-    consent_type = Column(String, nullable=False)  # Type of consent
-    granted = Column(Boolean, nullable=False)  # True for granted, False for denied
-    consent_details = Column(JSON)  # Additional details about the consent
-    granted_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime)  # When consent expires
-    withdrawn_at = Column(DateTime)  # When consent was withdrawn
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class ConsentManager:
