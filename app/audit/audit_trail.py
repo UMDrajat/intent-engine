@@ -8,11 +8,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import Session
 
-# Define Base here to avoid circular import
-from app.database import Base
+# Import AuditTrail from the canonical database module to avoid MetaData conflicts.
+# (Defining it here too would cause a duplicate-table crash at import time.)
+from app.database import AuditTrail  # noqa: F401  (re-exported for callers)
 
 
 class AuditEventType(Enum):
@@ -36,24 +36,6 @@ class AuditEventType(Enum):
     SYSTEM_ERROR = "system_error"
     DATA_EXPORT = "data_export"
     DATA_DELETION = "data_deletion"
-
-
-class AuditTrail(Base):
-    """Audit trail records table"""
-
-    __tablename__ = "audit_trails"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String)  # User performing the action
-    event_type = Column(String, nullable=False)  # Type of event
-    resource_type = Column(String)  # Type of resource affected (ad, campaign, etc.)
-    resource_id = Column(Integer)  # ID of the resource affected
-    action_description = Column(Text)  # Description of the action taken
-    ip_address = Column(String)  # IP address of the user
-    user_agent = Column(String)  # User agent string
-    payload = Column(JSON)  # Additional metadata about the event
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class AuditTrailManager:
