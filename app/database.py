@@ -437,17 +437,12 @@ class ConsentRecord(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=True)
-    consent_type = Column(String, nullable=False)
-    granted = Column(Boolean, nullable=False)
+    consent_type = Column(String, nullable=False, index=True)
+    granted = Column(Boolean, nullable=False, index=True)
     consent_details = Column(JSON, nullable=True)
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    __table_args__ = (
-        Index("ix_consent_records_user_id", "user_id", sqlite_if_not_exists=True),
-        Index("ix_consent_records_consent_type", "consent_type", sqlite_if_not_exists=True),
-    )
 
 
 class AuditEvent(Base):
@@ -465,14 +460,8 @@ class AuditEvent(Base):
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
     payload = Column(JSON, nullable=True)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        Index("ix_audit_events_event_type", "event_type", sqlite_if_not_exists=True),
-        Index("ix_audit_events_timestamp", "timestamp", sqlite_if_not_exists=True),
-        Index("ix_audit_events_user_id", "user_id", sqlite_if_not_exists=True),
-    )
 
 
 # Create tables if they don't exist
