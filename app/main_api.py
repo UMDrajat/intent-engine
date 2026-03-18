@@ -401,16 +401,17 @@ async def liveness_probe():
 
 
 # Core Intent Engine Endpoints
-@app.post("/extract-intent", response_model=UniversalIntent)
+@app.post("/extract-intent")
 @limiter.limit("10/minute")
 async def api_extract_intent(request: Request, extraction_request: IntentExtractionRequest, response: Response):
     """
     Extract structured intent from a natural language query.
+    Returns {"intent": UniversalIntent} to match test expectations.
     """
     try:
         result = extract_intent(extraction_request)
-        # Return the intent from the response
-        return result.intent
+        # Wrap intent in object to match test expectations: {"intent": ...}
+        return {"intent": result.intent}
     except Exception as e:
         logger.error(f"Intent extraction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -741,12 +742,12 @@ async def get_campaign_performance(db: Session = Depends(lambda: next(db_manager
             reports.append(CampaignPerformanceReport(
                 campaign_id=campaign.id,
                 campaign_name=campaign.name,
-                impressions=roi_data.total_impressions if roi_data else 0,
-                clicks=roi_data.total_clicks if roi_data else 0,
-                conversions=roi_data.total_conversions if roi_data else 0,
+                impressions=roi_data.impressions if roi_data else 0,
+                clicks=roi_data.clicks if roi_data else 0,
+                conversions=roi_data.conversions if roi_data else 0,
                 spend=roi_data.total_spend if roi_data else campaign.budget,
-                revenue=roi_data.revenue if roi_data else 0.0,
-                roi=roi_data.roi_percentage if roi_data else 0.0,
+                revenue=roi_data.total_revenue if roi_data else 0.0,
+                roi=roi_data.roi if roi_data else 0.0,
             ))
         return reports
     except Exception as e:
