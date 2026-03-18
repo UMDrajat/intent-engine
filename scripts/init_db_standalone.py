@@ -5,13 +5,20 @@ import os
 import sys
 
 # Configure database URL directly
-user = os.getenv("POSTGRES_USER", "intent_user")
-password = os.getenv("POSTGRES_PASSWORD", "intent_secure_password_change_in_prod")
-db = os.getenv("POSTGRES_DB", "intent_engine")
-host = "postgres"
-port = "5432"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+if not DATABASE_URL:
+    user = os.getenv("POSTGRES_USER", "intent_user")
+    password = os.getenv("POSTGRES_PASSWORD", "intent_secure_password_change_in_prod")
+    db = os.getenv("POSTGRES_DB", "intent_engine")
+    host = os.getenv("POSTGRES_HOST", "postgres")
+    port = os.getenv("POSTGRES_PORT", "5432")
+    DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+else:
+    # Extract user from URL if possible for GRANT command
+    import re
+    match = re.search(r'://([^:]+):', DATABASE_URL)
+    user = match.group(1) if match else os.getenv("POSTGRES_USER", "intent_user")
 
 from sqlalchemy import (
     JSON,

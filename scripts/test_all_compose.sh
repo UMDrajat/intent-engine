@@ -21,11 +21,12 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+COMPOSE_DIR="$PROJECT_DIR/infrastructure/compose"
 COMPOSE_FILES=(
-    "docker-compose.yml"
-    "docker-compose.searxng.yml"
-    "docker-compose.go-crawler.yml"
-    "docker-compose.aio.yml"
+    "$COMPOSE_DIR/docker-compose.yml"
+    "$COMPOSE_DIR/docker-compose.searxng.yml"
+    "$COMPOSE_DIR/docker-compose.go-crawler.yml"
+    "$COMPOSE_DIR/docker-compose.aio.yml"
 )
 
 # Colors

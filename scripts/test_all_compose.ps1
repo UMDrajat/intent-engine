@@ -21,11 +21,12 @@ $ErrorActionPreference = "Continue"
 # Configuration
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = Split-Path -Parent $ScriptDir
+$ComposeDir = Join-Path $ProjectDir "infrastructure\compose"
 $ComposeFiles = @(
-    "docker-compose.yml",
-    "docker-compose.searxng.yml",
-    "docker-compose.go-crawler.yml",
-    "docker-compose.aio.yml"
+    (Join-Path $ComposeDir "docker-compose.yml"),
+    (Join-Path $ComposeDir "docker-compose.searxng.yml"),
+    (Join-Path $ComposeDir "docker-compose.go-crawler.yml"),
+    (Join-Path $ComposeDir "docker-compose.aio.yml")
 )
 
 # Counters
@@ -320,12 +321,11 @@ function Run-ValidationTests {
     foreach ($composeFile in $ComposeFiles) {
         Print-Subheader "Testing: $composeFile"
         
-        $fullPath = Join-Path $ProjectDir $composeFile
-        Test-FileExists -File $fullPath
-        Test-YamlSyntax -ComposeFile $fullPath
-        Test-ServicesDefined -ComposeFile $fullPath
-        Test-NetworksDefined -ComposeFile $fullPath
-        Test-VolumesDefined -ComposeFile $fullPath
+        Test-FileExists -File $composeFile
+        Test-YamlSyntax -ComposeFile $composeFile
+        Test-ServicesDefined -ComposeFile $composeFile
+        Test-NetworksDefined -ComposeFile $composeFile
+        Test-VolumesDefined -ComposeFile $composeFile
     }
 }
 
@@ -351,9 +351,7 @@ function Run-ContainerTests {
     
     foreach ($composeFile in $ComposeFiles) {
         Print-Subheader "Testing: $composeFile"
-        
-        $fullPath = Join-Path $ProjectDir $composeFile
-        Test-ContainerHealth -ComposeFile $fullPath
+        Test-ContainerHealth -ComposeFile $composeFile
     }
 }
 
@@ -391,16 +389,16 @@ Write-Host "Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 
 # Run tests based on mode
 switch ($TestSuite) {
-    "validate" {
+    'validate' {
         Run-ValidationTests
     }
-    "health" {
+    'health' {
         Run-HealthTests
     }
-    "api" {
+    'api' {
         Run-ApiTests
     }
-    "full" {
+    'full' {
         Run-ValidationTests
         Run-ContainerTests
         Run-HealthTests

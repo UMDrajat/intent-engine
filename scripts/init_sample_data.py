@@ -2,9 +2,15 @@
 Script to initialize the database with sample data for the advertising system
 """
 
+import os
+import sys
 from datetime import datetime, timedelta
 
-from database import (
+# Add parent directory (app root) to path so we can import database module
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
+
+from app.database import (
     Ad,
     AdGroup,
     AdMetric,

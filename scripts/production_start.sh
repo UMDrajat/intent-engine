@@ -19,7 +19,7 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.prod.yml"
+COMPOSE_FILE="$PROJECT_DIR/infrastructure/compose/docker-compose.yml"
 COMPOSE_PROJECT_NAME="intent-engine"
 
 # Colors for output

@@ -1,6 +1,9 @@
 # Intent Engine - Development Makefile
 # Common development tasks simplified
 
+COMPOSE_FILE = infrastructure/compose/docker-compose.yml
+COMPOSE = docker-compose -f $(COMPOSE_FILE)
+
 .PHONY: help install dev test lint format clean docker-build docker-run migrations push quickpush fixpush dryrun p q f d
 
 # Default target
@@ -70,33 +73,33 @@ pre-commit:
 # ============================================================================
 
 test:
-	pytest tests/ -v
+	pytest app/tests/ -v
 
 test-cov:
-	pytest --cov=. --cov-report=html --cov-report=term-missing tests/
+	pytest --cov=app --cov-report=html --cov-report=term-missing app/tests/
 
 test-fast:
-	pytest -n auto --cov=. tests/
+	pytest -n auto --cov=app app/tests/
 
 test-watch:
-	ptw --now . -- -v tests/
+	ptw --now . -- -v app/tests/
 
 # ============================================================================
 # Code Quality
 # ============================================================================
 
 lint:
-	ruff check .
-	ruff format --check .
+	ruff check app/
+	ruff format --check app/
 
 format:
-	ruff check . --fix
-	ruff format .
+	ruff check app/ --fix
+	ruff format app/
 
 check: lint test
 
 security:
-	bandit -r . -f json -o bandit-report.json || true
+	bandit -r app/ -f json -o bandit-report.json || true
 	safety check -r requirements.txt --output json || true
 
 # ============================================================================
@@ -104,23 +107,23 @@ security:
 # ============================================================================
 
 docker-build:
-	docker-compose build
+	$(COMPOSE) build
 
 docker-run:
-	docker-compose up -d
+	$(COMPOSE) up -d
 	@echo "Waiting for services to start..."
 	@sleep 30
 	@echo "Checking API health..."
-	@curl -f http://localhost:8000/ || echo "API not ready yet"
+	@curl -f http://localhost:8000/health/live || echo "API not ready yet"
 
 docker-stop:
-	docker-compose down
+	$(COMPOSE) down
 
 docker-logs:
-	docker-compose logs -f
+	$(COMPOSE) logs -f
 
 docker-clean:
-	docker-compose down -v
+	$(COMPOSE) down -v
 	docker system prune -f
 
 # ============================================================================
@@ -128,7 +131,7 @@ docker-clean:
 # ============================================================================
 
 migrations:
-	@for migration in migrations/*.sql; do \
+	@for migration in infrastructure/database/migrations/*.sql; do \
 		if [ -f "$$migration" ]; then \
 			echo "Running $$migration"; \
 			docker exec intent-engine-postgres psql -U intent_user -d intent_engine -f "/tmp/$$(basename $$migration)" || \
@@ -180,7 +183,7 @@ clean:
 	find . -type f -name "*.pyc" -delete
 	find . -type f -name "*.pyo" -delete
 	find . -type d -name "*.egg-info" -exec rm -rf {} +
-	rm -rf build/ dist/ .pytest_cache/ htmlcov/ .mypy_cache/
+	rm -rf build/ dist/ app/.pytest_cache/ docs/coverage/ .mypy_cache/
 	rm -rf coverage.xml .coverage
 
 distclean: clean

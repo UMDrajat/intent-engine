@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # Configuration
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = Split-Path -Parent $ScriptDir
-$ComposeFile = Join-Path $ProjectDir "docker-compose.prod.yml"
+$ComposeFile = Join-Path $ProjectDir "infrastructure\compose\docker-compose.yml"
 $ComposeProjectName = "intent-engine"
 
 # Determine Docker Compose command
