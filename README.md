@@ -5,14 +5,14 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
-[![Version](https://img.shields.io/badge/version-2.3.1-blue.svg)](https://github.com/itxLikhith/intent-engine)
+[![Version](https://img.shields.io/badge/version-2.3.2-blue.svg)](https://github.com/itxLikhith/intent-engine)
 [![License](https://img.shields.io/badge/license-IECL--v1.0-red.svg)](LICENSE)
 
-**Latest Release:** v2.3.1 - Configuration & Health Improvements | **Docker Image:** `anony45/intent-engine-api:latest`
+**Latest Release:** v2.3.2 - Configuration & Health Improvements | **Docker Image:** `anony45/intent-engine-api:latest`
 
 ---
 
-## 🎯 What's New in v2.3.0 / v2.3.1
+## 🎯 What's New in v2.3.0 / v2.3.2
 
 ### ⚙️ Configuration Management
 **Centralized Pydantic Settings** - Type-safe configuration with validation:
