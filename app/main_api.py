@@ -617,9 +617,40 @@ async def api_rank_urls(request: URLRankingAPIRequest):
     Rank a list of URLs based on privacy and content.
     """
     try:
-        from app.ranking.optimized_url_ranker import rank_urls
-        results = await rank_urls(request.urls, request.intent)
-        return URLRankingAPIResponse(results=results, processing_time_ms=0.0)
+        from app.ranking.optimized_url_ranker import rank_urls, URLRankingRequest
+        ranking_request = URLRankingRequest(
+            query=request.query,
+            urls=request.urls,
+            intent=request.intent,
+            options=request.options,
+        )
+        ranking_response = await rank_urls(ranking_request)
+        
+        # Convert URLRankingResponse to URLRankingAPIResponse
+        ranked_results = [
+            URLRankedResult(
+                url=result.url,
+                title=result.title,
+                description=result.description,
+                domain=result.domain,
+                privacy_score=result.privacy_score,
+                tracker_count=result.tracker_count,
+                encryption_enabled=result.encryption_enabled,
+                content_type=result.content_type,
+                is_open_source=result.is_open_source,
+                is_non_profit=result.is_non_profit,
+                relevance_score=result.relevance_score,
+                final_score=result.final_score,
+            )
+            for result in ranking_response.ranked_urls
+        ]
+        return URLRankingAPIResponse(
+            query=ranking_response.query,
+            ranked_urls=ranked_results,
+            processing_time_ms=ranking_response.processing_time_ms,
+            total_urls=ranking_response.total_urls,
+            filtered_count=ranking_response.filtered_count,
+        )
     except Exception as e:
         logger.error(f"URL ranking error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
