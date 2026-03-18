@@ -168,10 +168,6 @@ htmlcov/
 .tox/
 *.cover
 *.coveragerc
-test_*.py
-*_test.py
-!tests/__init__.py
-!tests/conftest.py
 
 # Test reports
 test-results/
