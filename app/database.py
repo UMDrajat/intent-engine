@@ -429,6 +429,52 @@ class ABTestAssignment(Base):
     )
 
 
+class ConsentRecord(Base):
+    """
+    Consent record for tracking user consent
+    """
+    __tablename__ = "consent_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=True)
+    consent_type = Column(String, nullable=False)
+    granted = Column(Boolean, nullable=False)
+    consent_details = Column(JSON, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_consent_records_user_id", "user_id"),
+        Index("ix_consent_records_consent_type", "consent_type"),
+    )
+
+
+class AuditEvent(Base):
+    """
+    Audit event for tracking system events
+    """
+    __tablename__ = "audit_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=True)
+    event_type = Column(String, nullable=False, index=True)
+    resource_type = Column(String, nullable=True)
+    resource_id = Column(Integer, nullable=True)
+    action_description = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    payload = Column(JSON, nullable=True)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_audit_events_event_type", "event_type"),
+        Index("ix_audit_events_timestamp", "timestamp"),
+        Index("ix_audit_events_user_id", "user_id"),
+    )
+
+
 # Create tables if they don't exist
 # Moved this to happen inside the DatabaseManager to avoid import-time issues
 

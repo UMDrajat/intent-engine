@@ -23,7 +23,7 @@ from functools import wraps
 from typing import Any
 
 from app.config.redis_cache import RedisCache
-from app.config.redis_cache import cache as get_redis_cache
+from app.config.redis_cache import cache as redis_cache_instance
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class HybridQueryCache:
         # L2: Redis cache
         self.redis_cache: RedisCache | None = None
         if self.use_redis:
-            self.redis_cache = get_redis_cache()
+            self.redis_cache = redis_cache_instance
             if self.redis_cache is None:
                 logger.warning(f"Redis not available for cache '{name}', using local cache only")
                 self.use_redis = False
