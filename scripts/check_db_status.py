@@ -1,7 +1,14 @@
 #!/usr/bin/env python
 """Check database status"""
 
-from database import Ad, AdGroup, AdMetric, Advertiser, Campaign, CreativeAsset, SessionLocal
+import os
+import sys
+
+# Add parent directory (app root) to path so we can import database module
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
+
+from app.database import Ad, AdGroup, AdMetric, Advertiser, Campaign, CreativeAsset, SessionLocal
 
 db = SessionLocal()
 try:

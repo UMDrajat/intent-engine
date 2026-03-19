@@ -1,0 +1,6 @@
+{
+    "query": "best laptop",
+    "extract_intent": true,
+    "rank_results": true,
+    "max_results": 10
+}

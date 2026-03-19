@@ -18,7 +18,7 @@ from typing import Any
 import aiohttp
 
 # Test configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://localhost:80"  # AIO container runs on port 80 (nginx)
 SEARCH_ENDPOINT = f"{API_BASE_URL}/search"
 
 # Test queries with varying complexity
@@ -68,6 +68,18 @@ class PerformanceBenchmark:
                 response_time = (end_time - start_time) * 1000  # ms
 
                 data = await response.json()
+                
+                if response.status != 200:
+                    print(f"\n  Error from API: {data}")
+                    return {
+                        "query": query,
+                        "status": response.status,
+                        "response_time_ms": round(response_time, 2),
+                        "results_count": 0,
+                        "processing_time_ms": 0,
+                        "success": False,
+                        "error_data": data
+                    }
 
                 return {
                     "query": query,
@@ -75,7 +87,7 @@ class PerformanceBenchmark:
                     "response_time_ms": round(response_time, 2),
                     "results_count": data.get("total_results", 0),
                     "processing_time_ms": data.get("processing_time_ms", 0),
-                    "success": response.status == 200,
+                    "success": True,
                 }
         except Exception as e:
             end_time = time.perf_counter()
@@ -83,6 +95,7 @@ class PerformanceBenchmark:
                 "query": query,
                 "status": 0,
                 "response_time_ms": round((end_time - start_time) * 1000, 2),
+                "results_count": 0,
                 "error": str(e),
                 "success": False,
             }

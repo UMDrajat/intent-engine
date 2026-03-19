@@ -22,7 +22,7 @@ sys.path.insert(0, parent_dir)
 
 from sqlalchemy.orm import Session
 
-from database import (
+from app.database import (
     Ad,
     AdGroup,
     Advertiser,

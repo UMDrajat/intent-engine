@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, os.path.abspath(".."))
 
 
-from main_api import app
+from app.main_api import app
 
 
 def test_api_routes():
