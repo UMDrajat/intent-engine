@@ -101,17 +101,33 @@ def main():
                     # Determine intent goal from content
                     intent_goal = "learn"  # default
                     if any(
-                        word in text_content.lower() for word in ["fix", "error", "problem", "issue", "troubleshoot"]
+                        word in text_content.lower()
+                        for word in ["fix", "error", "problem", "issue", "troubleshoot"]
                     ):
                         intent_goal = "troubleshooting"
-                    elif any(word in text_content.lower() for word in ["compare", "vs", "versus", "better", "best"]):
+                    elif any(
+                        word in text_content.lower()
+                        for word in ["compare", "vs", "versus", "better", "best"]
+                    ):
                         intent_goal = "comparison"
-                    elif any(word in text_content.lower() for word in ["buy", "price", "cost", "purchase"]):
+                    elif any(
+                        word in text_content.lower()
+                        for word in ["buy", "price", "cost", "purchase"]
+                    ):
                         intent_goal = "purchase"
 
                     # Extract topics (simple keyword extraction)
                     topics = []
-                    for keyword in ["tutorial", "guide", "example", "function", "package", "api", "web", "database"]:
+                    for keyword in [
+                        "tutorial",
+                        "guide",
+                        "example",
+                        "function",
+                        "package",
+                        "api",
+                        "web",
+                        "database",
+                    ]:
                         if keyword in text_content.lower():
                             topics.append(keyword)
 
@@ -132,9 +148,13 @@ def main():
                 if documents:
                     indexed = indexer.index_documents(documents)
                     indexed_count += indexed
-                    logger.info(f"Indexed batch {i // batch_size + 1}: {indexed} documents")
+                    logger.info(
+                        f"Indexed batch {i // batch_size + 1}: {indexed} documents"
+                    )
 
-            logger.info(f"✅ Indexing complete! Total indexed: {indexed_count}/{len(pages)}")
+            logger.info(
+                f"✅ Indexing complete! Total indexed: {indexed_count}/{len(pages)}"
+            )
 
             # Get stats
             stats = indexer.get_stats()

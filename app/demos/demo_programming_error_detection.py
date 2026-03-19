@@ -83,7 +83,9 @@ FileNotFoundError: [Errno 2] No such file or directory: 'data.csv' """,
         # Programming-specific info
         print("\n💻 Programming Detection:")
         print(f"   Is Programming Query: {metrics.get('isProgrammingQuery', False)}")
-        print(f"   Programming Confidence: {metrics.get('programmingConfidence', 0):.2f}")
+        print(
+            f"   Programming Confidence: {metrics.get('programmingConfidence', 0):.2f}"
+        )
 
         if intent.inferred.programmingContext:
             prog_ctx = intent.inferred.programmingContext
@@ -197,7 +199,9 @@ def demo_search_enhancement():
     print(f"{'=' * 80}")
     print()
 
-    from app.extraction.programming_error_detector import get_programming_intent_extractor
+    from app.extraction.programming_error_detector import (
+        get_programming_intent_extractor,
+    )
 
     extractor = get_programming_intent_extractor()
 

@@ -55,7 +55,9 @@ class KafkaEventPublisher:
         self._event_buffer = []
         self._buffer_size = self.config.get("buffer_size", 100)
 
-        logger.info(f"KafkaEventPublisher initialized: servers={self.bootstrap_servers}, enabled={self._enabled}")
+        logger.info(
+            f"KafkaEventPublisher initialized: servers={self.bootstrap_servers}, enabled={self._enabled}"
+        )
 
     def _get_producer(self) -> Any | None:
         """Lazy Kafka producer initialization"""
@@ -75,7 +77,9 @@ class KafkaEventPublisher:
                 logger.info("Kafka producer initialized")
 
             except ImportError:
-                logger.warning("kafka-python not installed. Install with: pip install kafka-python")
+                logger.warning(
+                    "kafka-python not installed. Install with: pip install kafka-python"
+                )
                 self._enabled = False
                 return None
             except Exception as e:
@@ -249,7 +253,9 @@ class KafkaEventPublisher:
 
         producer = self._get_producer()
         if not producer:
-            logger.warning(f"Buffer has {len(self._event_buffer)} events, but no producer")
+            logger.warning(
+                f"Buffer has {len(self._event_buffer)} events, but no producer"
+            )
             return
 
         try:
@@ -296,7 +302,9 @@ class KafkaEventSubscriber:
         self._consumer = None
         self._running = False
 
-        logger.info(f"KafkaEventSubscriber initialized: servers={self.bootstrap_servers}, group={self.group_id}")
+        logger.info(
+            f"KafkaEventSubscriber initialized: servers={self.bootstrap_servers}, group={self.group_id}"
+        )
 
     def subscribe(self, topics: list[str], callback: Callable[[str, dict], None]):
         """

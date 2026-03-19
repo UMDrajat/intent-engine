@@ -172,7 +172,9 @@ class RedisCache:
             logger.error(f"Redis GET error: {e}")
             return None
 
-    async def set(self, key: str, value: Any, ttl: int | None = None, background: bool = False):
+    async def set(
+        self, key: str, value: Any, ttl: int | None = None, background: bool = False
+    ):
         """
         Set value in cache with TTL.
 
@@ -253,14 +255,20 @@ class RedisCache:
 
         return value
 
-    async def get_search(self, query: str, pageno: int = 1, language: str = "en") -> dict | None:
+    async def get_search(
+        self, query: str, pageno: int = 1, language: str = "en"
+    ) -> dict | None:
         """Get cached search results"""
-        key = self._generate_key("search", query=query, pageno=pageno, language=language)
+        key = self._generate_key(
+            "search", query=query, pageno=pageno, language=language
+        )
         return await self.get(key)
 
     async def set_search(self, query: str, pageno: int, language: str, results: dict):
         """Cache search results"""
-        key = self._generate_key("search", query=query, pageno=pageno, language=language)
+        key = self._generate_key(
+            "search", query=query, pageno=pageno, language=language
+        )
         await self.set(key, results, ttl=self._search_ttl, background=True)
 
     async def get_intent(self, query: str) -> dict | None:
@@ -312,7 +320,9 @@ class RedisCache:
             cursor = 0
 
             while True:
-                cursor, keys = await self._client.scan(cursor, match=search_pattern, count=100)
+                cursor, keys = await self._client.scan(
+                    cursor, match=search_pattern, count=100
+                )
                 if keys:
                     await self._client.delete(*keys)
                     logger.info(f"Flushed {len(keys)} cache keys")

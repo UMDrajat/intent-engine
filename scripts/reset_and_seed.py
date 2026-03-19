@@ -10,7 +10,9 @@ print("=" * 60)
 
 # Run init_db_direct.py to reset and create tables
 print("\n[1/2] Initializing database...")
-result = subprocess.run([sys.executable, "init_db_direct.py"], capture_output=True, text=True)
+result = subprocess.run(
+    [sys.executable, "init_db_direct.py"], capture_output=True, text=True
+)
 print(result.stdout)
 if result.returncode != 0:
     print(f"Error initializing database: {result.stderr}")
@@ -18,7 +20,9 @@ if result.returncode != 0:
 
 # Run seed_sample_data.py
 print("\n[2/2] Seeding sample data...")
-result = subprocess.run([sys.executable, "seed_sample_data.py"], capture_output=True, text=True)
+result = subprocess.run(
+    [sys.executable, "seed_sample_data.py"], capture_output=True, text=True
+)
 print(result.stdout)
 if result.returncode != 0:
     print(f"Error seeding data: {result.stderr}")

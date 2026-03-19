@@ -212,7 +212,9 @@ class IntentEngineLoadTest(HttpUser):
             },
         }
 
-        with self.client.post("/extract-intent", json=payload, catch_response=True) as response:
+        with self.client.post(
+            "/extract-intent", json=payload, catch_response=True
+        ) as response:
             if response.status_code == 200:
                 data = response.json()
                 if "intent" in data:
@@ -243,7 +245,9 @@ class IntentEngineLoadTest(HttpUser):
             },
         }
 
-        with self.client.post("/rank-urls", json=payload, catch_response=True) as response:
+        with self.client.post(
+            "/rank-urls", json=payload, catch_response=True
+        ) as response:
             if response.status_code == 200:
                 data = response.json()
                 if "ranked_urls" in data and len(data["ranked_urls"]) > 0:
@@ -288,7 +292,9 @@ class IntentEngineLoadTest(HttpUser):
 
         payload = {"intent": intent, "candidates": candidates}
 
-        with self.client.post("/rank-results", json=payload, catch_response=True) as response:
+        with self.client.post(
+            "/rank-results", json=payload, catch_response=True
+        ) as response:
             if response.status_code == 200:
                 response.success()
             else:
@@ -335,7 +341,9 @@ class IntentEngineLoadTest(HttpUser):
             "config": {"minThreshold": 0.3, "topK": 3},
         }
 
-        with self.client.post("/match-ads", json=payload, catch_response=True) as response:
+        with self.client.post(
+            "/match-ads", json=payload, catch_response=True
+        ) as response:
             if response.status_code == 200:
                 response.success()
             else:
@@ -381,7 +389,9 @@ class IntentEngineLoadTest(HttpUser):
             ],
         }
 
-        with self.client.post("/recommend-services", json=payload, catch_response=True) as response:
+        with self.client.post(
+            "/recommend-services", json=payload, catch_response=True
+        ) as response:
             if response.status_code == 200:
                 response.success()
             else:
@@ -420,7 +430,9 @@ class CampaignManagementLoadTest(HttpUser):
             "status": "active",
         }
 
-        with self.client.post("/campaigns", json=payload, catch_response=True) as response:
+        with self.client.post(
+            "/campaigns", json=payload, catch_response=True
+        ) as response:
             if response.status_code == 200:
                 response.success()
             else:
@@ -429,7 +441,9 @@ class CampaignManagementLoadTest(HttpUser):
     @task(20)
     def get_campaign_performance(self):
         """Get campaign performance report"""
-        with self.client.get("/reports/campaign-performance", catch_response=True) as response:
+        with self.client.get(
+            "/reports/campaign-performance", catch_response=True
+        ) as response:
             if response.status_code == 200:
                 response.success()
             else:
@@ -462,7 +476,9 @@ def on_quitting(environment, **kwargs):
     print(f"Total requests: {environment.stats.total.num_requests}")
     print(f"Failed requests: {environment.stats.total.num_failures}")
     print(f"Average response time: {environment.stats.total.avg_response_time:.2f}ms")
-    print(f"95th percentile: {environment.stats.total.get_response_time_percentile(0.95):.2f}ms")
+    print(
+        f"95th percentile: {environment.stats.total.get_response_time_percentile(0.95):.2f}ms"
+    )
     print("=" * 60)
 
 

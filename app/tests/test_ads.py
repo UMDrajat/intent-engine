@@ -6,9 +6,18 @@ import copy
 import unittest
 
 from app.ads.matcher import AdMatchingRequest, AdMetadata, match_ads
-from app.core.schema import (Constraint, ConstraintType, DeclaredIntent,
-                         EthicalDimension, EthicalSignal, InferredIntent,
-                         IntentGoal, SkillLevel, UniversalIntent, UseCase)
+from app.core.schema import (
+    Constraint,
+    ConstraintType,
+    DeclaredIntent,
+    EthicalDimension,
+    EthicalSignal,
+    InferredIntent,
+    IntentGoal,
+    SkillLevel,
+    UniversalIntent,
+    UseCase,
+)
 
 
 class TestAdMatcher(unittest.TestCase):
@@ -27,7 +36,12 @@ class TestAdMatcher(unittest.TestCase):
                 query="How to setup E2E encrypted email on Android, no big tech solutions",
                 goal=IntentGoal.LEARN,
                 constraints=[
-                    Constraint(type=ConstraintType.INCLUSION, dimension="platform", value="Android", hardFilter=True),
+                    Constraint(
+                        type=ConstraintType.INCLUSION,
+                        dimension="platform",
+                        value="Android",
+                        hardFilter=True,
+                    ),
                     Constraint(
                         type=ConstraintType.EXCLUSION,
                         dimension="provider",
@@ -35,7 +49,10 @@ class TestAdMatcher(unittest.TestCase):
                         hardFilter=True,
                     ),
                     Constraint(
-                        type=ConstraintType.INCLUSION, dimension="license", value="open_source", hardFilter=True
+                        type=ConstraintType.INCLUSION,
+                        dimension="license",
+                        value="open_source",
+                        hardFilter=True,
                     ),
                 ],
                 negativePreferences=["no big tech"],
@@ -44,8 +61,13 @@ class TestAdMatcher(unittest.TestCase):
             inferred=InferredIntent(
                 useCases=[UseCase.LEARNING, UseCase.TROUBLESHOOTING],
                 ethicalSignals=[
-                    EthicalSignal(dimension=EthicalDimension.PRIVACY, preference="privacy-first"),
-                    EthicalSignal(dimension=EthicalDimension.OPENNESS, preference="open-source_preferred"),
+                    EthicalSignal(
+                        dimension=EthicalDimension.PRIVACY, preference="privacy-first"
+                    ),
+                    EthicalSignal(
+                        dimension=EthicalDimension.OPENNESS,
+                        preference="open-source_preferred",
+                    ),
                 ],
             ),
         )
@@ -77,7 +99,9 @@ class TestAdMatcher(unittest.TestCase):
         )
 
         request = AdMatchingRequest(
-            intent=self.sample_intent, adInventory=[bad_ad, good_ad], config={"topK": 5, "minThreshold": 0.4}
+            intent=self.sample_intent,
+            adInventory=[bad_ad, good_ad],
+            config={"topK": 5, "minThreshold": 0.4},
         )
 
         response = match_ads(request)
@@ -94,7 +118,11 @@ class TestAdMatcher(unittest.TestCase):
             id="compliant_ad_1",
             title="ProtonMail Android",
             description="Secure email for Android devices",
-            targetingConstraints={"platform": ["Android"], "provider": ["ProtonMail"], "license": ["open_source"]},
+            targetingConstraints={
+                "platform": ["Android"],
+                "provider": ["ProtonMail"],
+                "license": ["open_source"],
+            },
             forbiddenDimensions=[],
             qualityScore=0.9,
             ethicalTags=["privacy", "open_source"],
@@ -132,7 +160,11 @@ class TestAdMatcher(unittest.TestCase):
 
         request = AdMatchingRequest(
             intent=self.sample_intent,
-            adInventory=[compliant_ad, non_compliant_ad_platform, non_compliant_ad_provider],
+            adInventory=[
+                compliant_ad,
+                non_compliant_ad_platform,
+                non_compliant_ad_provider,
+            ],
             config={"topK": 5, "minThreshold": 0.4},
         )
 
@@ -170,14 +202,19 @@ class TestAdMatcher(unittest.TestCase):
         )
 
         request = AdMatchingRequest(
-            intent=self.sample_intent, adInventory=[ethical_ad, non_ethical_ad], config={"topK": 5, "minThreshold": 0.4}
+            intent=self.sample_intent,
+            adInventory=[ethical_ad, non_ethical_ad],
+            config={"topK": 5, "minThreshold": 0.4},
         )
 
         response = match_ads(request)
 
         # Both ads should match, but ethical ad should rank higher
         self.assertEqual(len(response.matchedAds), 2)
-        self.assertGreater(response.matchedAds[0].adRelevanceScore, response.matchedAds[1].adRelevanceScore)
+        self.assertGreater(
+            response.matchedAds[0].adRelevanceScore,
+            response.matchedAds[1].adRelevanceScore,
+        )
         self.assertEqual(response.matchedAds[0].ad.id, "ethical_ad_1")
 
     def test_semantic_relevance_scoring(self):
@@ -214,7 +251,10 @@ class TestAdMatcher(unittest.TestCase):
 
         # Both ads satisfy constraints, but relevant ad should score higher
         if len(response.matchedAds) >= 2:
-            self.assertGreater(response.matchedAds[0].adRelevanceScore, response.matchedAds[1].adRelevanceScore)
+            self.assertGreater(
+                response.matchedAds[0].adRelevanceScore,
+                response.matchedAds[1].adRelevanceScore,
+            )
             self.assertEqual(response.matchedAds[0].ad.id, "relevant_ad_1")
 
     def test_edge_case_no_valid_ads(self):
@@ -234,7 +274,9 @@ class TestAdMatcher(unittest.TestCase):
                 id="bad_ad_2",
                 title="Wrong Platform",
                 description="Targets wrong platform",
-                targetingConstraints={"platform": ["iOS"]},  # Doesn't match Android requirement
+                targetingConstraints={
+                    "platform": ["iOS"]
+                },  # Doesn't match Android requirement
                 forbiddenDimensions=[],
                 qualityScore=0.8,
                 ethicalTags=["privacy"],
@@ -242,14 +284,18 @@ class TestAdMatcher(unittest.TestCase):
         ]
 
         request = AdMatchingRequest(
-            intent=self.sample_intent, adInventory=bad_ads, config={"topK": 5, "minThreshold": 0.4}
+            intent=self.sample_intent,
+            adInventory=bad_ads,
+            config={"topK": 5, "minThreshold": 0.4},
         )
 
         response = match_ads(request)
 
         # No ads should be returned
         self.assertEqual(len(response.matchedAds), 0)
-        self.assertEqual(response.metrics["adsPassedFairness"], 1)  # Only one ad passes fairness check
+        self.assertEqual(
+            response.metrics["adsPassedFairness"], 1
+        )  # Only one ad passes fairness check
 
     def test_edge_case_all_ads_rejected(self):
         """Test behavior when all ads are rejected by constraints"""
@@ -259,7 +305,10 @@ class TestAdMatcher(unittest.TestCase):
                 id="failing_ad_1",
                 title="Google Service",
                 description="Email service from Google",
-                targetingConstraints={"platform": ["Android"], "provider": ["Google"]},  # Violates exclusion
+                targetingConstraints={
+                    "platform": ["Android"],
+                    "provider": ["Google"],
+                },  # Violates exclusion
                 forbiddenDimensions=[],  # Passes fairness
                 qualityScore=0.9,
                 ethicalTags=["privacy"],
@@ -268,7 +317,10 @@ class TestAdMatcher(unittest.TestCase):
                 id="failing_ad_2",
                 title="Proprietary Solution",
                 description="Closed source email",
-                targetingConstraints={"platform": ["Android"], "license": ["proprietary"]},  # Violates inclusion
+                targetingConstraints={
+                    "platform": ["Android"],
+                    "license": ["proprietary"],
+                },  # Violates inclusion
                 forbiddenDimensions=[],  # Passes fairness
                 qualityScore=0.8,
                 ethicalTags=["basic"],
@@ -276,7 +328,9 @@ class TestAdMatcher(unittest.TestCase):
         ]
 
         request = AdMatchingRequest(
-            intent=self.sample_intent, adInventory=constraint_failing_ads, config={"topK": 5, "minThreshold": 0.4}
+            intent=self.sample_intent,
+            adInventory=constraint_failing_ads,
+            config={"topK": 5, "minThreshold": 0.4},
         )
 
         response = match_ads(request)
@@ -284,7 +338,9 @@ class TestAdMatcher(unittest.TestCase):
         # No ads should pass constraints
         self.assertEqual(len(response.matchedAds), 0)
         self.assertEqual(response.metrics["adsPassedFairness"], 2)  # Both pass fairness
-        self.assertEqual(response.metrics["adsFiltered"], 2)  # Both filtered by constraints
+        self.assertEqual(
+            response.metrics["adsFiltered"], 2
+        )  # Both filtered by constraints
 
     def test_match_reasons_generation(self):
         """Test that match reasons are properly generated"""
@@ -299,7 +355,9 @@ class TestAdMatcher(unittest.TestCase):
         )
 
         request = AdMatchingRequest(
-            intent=self.sample_intent, adInventory=[compliant_ad], config={"topK": 5, "minThreshold": 0.4}
+            intent=self.sample_intent,
+            adInventory=[compliant_ad],
+            config={"topK": 5, "minThreshold": 0.4},
         )
 
         response = match_ads(request)
@@ -312,10 +370,15 @@ class TestAdMatcher(unittest.TestCase):
         self.assertGreater(len(matched_ad.matchReasons), 0)
 
         # Check for expected types of reasons
-        has_constraint_reason = any("platform=" in reason for reason in matched_ad.matchReasons)
-        has_ethical_reason = any("ethical alignment" in reason for reason in matched_ad.matchReasons)
+        has_constraint_reason = any(
+            "platform=" in reason for reason in matched_ad.matchReasons
+        )
+        has_ethical_reason = any(
+            "ethical alignment" in reason for reason in matched_ad.matchReasons
+        )
         has_query_match = any(
-            "query semantic match" in reason or "keyword match" in reason for reason in matched_ad.matchReasons
+            "query semantic match" in reason or "keyword match" in reason
+            for reason in matched_ad.matchReasons
         )
 
         # At least one type of reason should be present

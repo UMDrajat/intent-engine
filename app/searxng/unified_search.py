@@ -107,7 +107,9 @@ class UnifiedSearchService:
         cached_response = await self._get_cached_search_response(cache_key)
         if cached_response:
             elapsed = (time.time() - start_time) * 1000
-            logger.info(f"✓ Cache hit for query: {request.query[:50]} (latency: {elapsed:.2f}ms)")
+            logger.info(
+                f"✓ Cache hit for query: {request.query[:50]} (latency: {elapsed:.2f}ms)"
+            )
             return cached_response
 
         # Record query for topic learning (async, non-blocking, fire-and-forget)
@@ -126,16 +128,22 @@ class UnifiedSearchService:
             if not intent_result:
                 # If not in cache, start background extraction with timeout
                 intent_task = asyncio.create_task(
-                    asyncio.to_thread(self._extract_intent_with_error_handling, request.query)
+                    asyncio.to_thread(
+                        self._extract_intent_with_error_handling, request.query
+                    )
                 )
 
                 # Phase 1 Optimization: Wait briefly for intent to allow optimized routing
                 try:
                     # Wait up to 150ms for intent extraction (usually takes <50ms cached, <200ms uncached)
-                    intent_result = await asyncio.wait_for(asyncio.shield(intent_task), timeout=0.15)
+                    intent_result = await asyncio.wait_for(
+                        asyncio.shield(intent_task), timeout=0.15
+                    )
                 except (asyncio.TimeoutError, Exception):
                     # If it takes longer, we'll continue with default routing
-                    logger.debug("Intent extraction taking >150ms, proceeding with default routing")
+                    logger.debug(
+                        "Intent extraction taking >150ms, proceeding with default routing"
+                    )
 
         # Step 2: Determine Route based on intent if available
         from app.searxng.query_router import QueryRoute, SearchBackend
@@ -144,7 +152,9 @@ class UnifiedSearchService:
             universal_intent = intent_result.intent
             extracted_intent = self._convert_to_extracted_intent(universal_intent)
             route = self.query_router.route(universal_intent)
-            logger.info(f"Using optimized intent-based route: {[b.value for b in route.backends]}")
+            logger.info(
+                f"Using optimized intent-based route: {[b.value for b in route.backends]}"
+            )
         else:
             # Default fallback route
             route = QueryRoute(
@@ -156,7 +166,9 @@ class UnifiedSearchService:
             logger.debug("Using default hybrid routing")
 
         # Execute search across backends
-        search_task = asyncio.create_task(self.query_router.execute_search(route=route, query=request.query))
+        search_task = asyncio.create_task(
+            self.query_router.execute_search(route=route, query=request.query)
+        )
 
         # Wait for intent if it's still running (e.g., if we timed out waiting for it above)
         if request.extract_intent and not intent_result and intent_task:
@@ -164,7 +176,9 @@ class UnifiedSearchService:
                 intent_result = await intent_task
                 if intent_result and hasattr(intent_result, "intent"):
                     universal_intent = intent_result.intent
-                    extracted_intent = self._convert_to_extracted_intent(universal_intent)
+                    extracted_intent = self._convert_to_extracted_intent(
+                        universal_intent
+                    )
                     logger.info(
                         f"Intent extracted (late): goal={extracted_intent.goal}, use_cases={extracted_intent.use_cases}"
                     )
@@ -178,9 +192,13 @@ class UnifiedSearchService:
             # Timeout scales with max_results but caps at 5 seconds (Priority 2 fix)
             search_timeout = min(5.0, 2.0 + (request.max_results or 20) * 0.15)
             raw_results = await asyncio.wait_for(search_task, timeout=search_timeout)
-            logger.info(f"Federated search returned {len(raw_results)} raw results in {search_timeout:.1f}s")
+            logger.info(
+                f"Federated search returned {len(raw_results)} raw results in {search_timeout:.1f}s"
+            )
         except asyncio.TimeoutError:
-            logger.warning(f"Federated search timed out after {search_timeout}s, cancelling...")
+            logger.warning(
+                f"Federated search timed out after {search_timeout}s, cancelling..."
+            )
             search_task.cancel()
             # Fallback to SearXNG only (more reliable)
             logger.warning("Falling back to SearXNG only")
@@ -197,7 +215,9 @@ class UnifiedSearchService:
 
         # Convert aggregated results to ranked results
         # Use enhanced ranker if available, fallback to default
-        ranked_results = await self._convert_aggregated_to_ranked_enhanced(aggregated_results, universal_intent, request)
+        ranked_results = await self._convert_aggregated_to_ranked_enhanced(
+            aggregated_results, universal_intent, request
+        )
 
         # Step 5: Apply privacy filters (if requested)
         if request.min_privacy_score or request.exclude_big_tech:
@@ -231,7 +251,9 @@ class UnifiedSearchService:
             engines_used=engines_used,
             categories_searched=request.categories or ["general"],
             ranking_applied=request.rank_results and universal_intent is not None,
-            results_ranked=len([r for r in ranked_results if r.ranked_score != r.original_score]),
+            results_ranked=len(
+                [r for r in ranked_results if r.ranked_score != r.original_score]
+            ),
             privacy_enhanced=True,
             tracking_blocked=True,
         )
@@ -239,12 +261,16 @@ class UnifiedSearchService:
         # Add custom metrics for federated search
         response.metrics = {
             "backend_distribution": backend_distribution,
-            "aggregation_ratio": len(aggregated_results) / len(raw_results) if raw_results else 0,
+            "aggregation_ratio": len(aggregated_results) / len(raw_results)
+            if raw_results
+            else 0,
             "routing_strategy": str([b.value for b in route.backends]),
             "parallel_execution": route.parallel,
         }
 
-        logger.info(f"✓ Unified search (v2) complete: {len(response.results)} results in {processing_time_ms:.2f}ms")
+        logger.info(
+            f"✓ Unified search (v2) complete: {len(response.results)} results in {processing_time_ms:.2f}ms"
+        )
 
         # Cache the response (L2 Redis cache, 1-hour TTL)
         cache_key = f"search:{normalize_query(request.query)}:{request.max_results}:{request.rank_results}"
@@ -287,12 +313,20 @@ class UnifiedSearchService:
             unique_urls = list({item["url"]: item for item in urls}.values())
 
             # Prioritize high-scoring results
-            high_priority_urls = [item["url"] for item in unique_urls if item.get("score", 0) > 5.0][:10]
-            normal_priority_urls = [item["url"] for item in unique_urls if item.get("score", 0) <= 5.0][:20]
+            high_priority_urls = [
+                item["url"] for item in unique_urls if item.get("score", 0) > 5.0
+            ][:10]
+            normal_priority_urls = [
+                item["url"] for item in unique_urls if item.get("score", 0) <= 5.0
+            ][:20]
 
             # Add to crawl queue
-            added_high = seed_manager.add_urls_to_crawl_queue(high_priority_urls, priority=8, depth=1)
-            added_normal = seed_manager.add_urls_to_crawl_queue(normal_priority_urls, priority=5, depth=2)
+            added_high = seed_manager.add_urls_to_crawl_queue(
+                high_priority_urls, priority=8, depth=1
+            )
+            added_normal = seed_manager.add_urls_to_crawl_queue(
+                normal_priority_urls, priority=5, depth=2
+            )
 
             total_added = added_high + added_normal
 
@@ -327,7 +361,9 @@ class UnifiedSearchService:
             logger.warning(f"Intent extraction error in thread: {e}")
             raise
 
-    def _convert_to_extracted_intent(self, universal_intent: UniversalIntent) -> ExtractedIntent:
+    def _convert_to_extracted_intent(
+        self, universal_intent: UniversalIntent
+    ) -> ExtractedIntent:
         """Convert UniversalIntent to ExtractedIntent for API response."""
         # Defensive: handle None values in inferred intent
         inferred = universal_intent.inferred if universal_intent.inferred else None
@@ -347,11 +383,19 @@ class UnifiedSearchService:
         programming_context_dict = None
         research_plan_dict = None
 
-        if inferred and hasattr(inferred, "programmingContext") and inferred.programmingContext:
+        if (
+            inferred
+            and hasattr(inferred, "programmingContext")
+            and inferred.programmingContext
+        ):
             ctx = inferred.programmingContext
             programming_context_dict = {
-                "language": ctx.language.value if hasattr(ctx.language, "value") else str(ctx.language),
-                "errorType": ctx.errorType.value if hasattr(ctx.errorType, "value") else str(ctx.errorType),
+                "language": ctx.language.value
+                if hasattr(ctx.language, "value")
+                else str(ctx.language),
+                "errorType": ctx.errorType.value
+                if hasattr(ctx.errorType, "value")
+                else str(ctx.errorType),
                 "errorCode": ctx.errorCode,
                 "errorMessage": ctx.errorMessage,
                 "framework": ctx.framework,
@@ -365,7 +409,9 @@ class UnifiedSearchService:
                 assistance = engine.generate_assistance_response(universal_intent)
 
                 # Get optimized queries from programming extractor if possible
-                from app.extraction.programming_error_detector import get_programming_intent_extractor
+                from app.extraction.programming_error_detector import (
+                    get_programming_intent_extractor,
+                )
 
                 prog_extractor = get_programming_intent_extractor()
                 optimized_queries = prog_extractor.generate_optimized_queries(ctx)
@@ -373,7 +419,9 @@ class UnifiedSearchService:
                 if assistance.research_plan:
                     rp = assistance.research_plan
                     # Merge optimized queries
-                    final_queries = list(set(optimized_queries + rp.optimized_search_queries))
+                    final_queries = list(
+                        set(optimized_queries + rp.optimized_search_queries)
+                    )
 
                     research_plan_dict = {
                         "investigation_steps": rp.investigation_steps,
@@ -382,9 +430,14 @@ class UnifiedSearchService:
                     }
                 elif optimized_queries:
                     research_plan_dict = {
-                        "investigation_steps": ["Search for the error message", "Analyze community solutions"],
+                        "investigation_steps": [
+                            "Search for the error message",
+                            "Analyze community solutions",
+                        ],
                         "optimized_search_queries": optimized_queries,
-                        "key_concepts": [ctx.language.value] if hasattr(ctx.language, "value") else [str(ctx.language)],
+                        "key_concepts": [ctx.language.value]
+                        if hasattr(ctx.language, "value")
+                        else [str(ctx.language)],
                     }
             except Exception as e:
                 logger.warning(f"Failed to generate research plan: {e}")
@@ -399,9 +452,19 @@ class UnifiedSearchService:
                 }
                 for c in constraints_list
             ],
-            use_cases=[uc.value if hasattr(uc, "value") else str(uc) for uc in use_cases_list],
-            result_type=(inferred.resultType.value if inferred and inferred.resultType else "unknown"),
-            complexity=(inferred.complexity.value if inferred and inferred.complexity else "moderate"),
+            use_cases=[
+                uc.value if hasattr(uc, "value") else str(uc) for uc in use_cases_list
+            ],
+            result_type=(
+                inferred.resultType.value
+                if inferred and inferred.resultType
+                else "unknown"
+            ),
+            complexity=(
+                inferred.complexity.value
+                if inferred and inferred.complexity
+                else "moderate"
+            ),
             confidence=0.8,  # Default confidence
             programming_context=programming_context_dict,
             research_plan=research_plan_dict,
@@ -434,7 +497,11 @@ class UnifiedSearchService:
 
             # Filter big tech
             if request.exclude_big_tech:
-                domain = result.url.split("/")[2].lower() if "/" in result.url else result.url.lower()
+                domain = (
+                    result.url.split("/")[2].lower()
+                    if "/" in result.url
+                    else result.url.lower()
+                )
                 if any(bt in domain for bt in big_tech_domains):
                     continue
 
@@ -448,7 +515,9 @@ class UnifiedSearchService:
 
     # NEW: Helper methods for Query Router integration
 
-    async def _search_searxng_as_router_results(self, request: UnifiedSearchRequest) -> list[RouterSearchResult]:
+    async def _search_searxng_as_router_results(
+        self, request: UnifiedSearchRequest
+    ) -> list[RouterSearchResult]:
         """Search SearXNG and return as RouterSearchResult format (fallback)"""
         from app.searxng.query_router import SearchBackend
 
@@ -473,7 +542,10 @@ class UnifiedSearchService:
                     content=r.content,
                     score=r.score if r.score else 0.5,
                     engine=r.engine,
-                    metadata={"category": r.category, "published_date": r.published_date},
+                    metadata={
+                        "category": r.category,
+                        "published_date": r.published_date,
+                    },
                 )
                 for r in response.results
             ]
@@ -496,7 +568,10 @@ class UnifiedSearchService:
                 url=agg_result.url,
                 title=agg_result.title,
                 content=agg_result.content,
-                engine=agg_result.metadata.get("source_details", {}).keys().__iter__().__next__()
+                engine=agg_result.metadata.get("source_details", {})
+                .keys()
+                .__iter__()
+                .__next__()
                 if agg_result.metadata.get("source_details")
                 else "aggregated",
                 original_score=agg_result.best_score,
@@ -509,17 +584,25 @@ class UnifiedSearchService:
                 currency=agg_result.metadata.get("currency"),
                 intent_goal=(
                     universal_intent.declared.goal.value
-                    if universal_intent and universal_intent.declared and universal_intent.declared.goal
+                    if universal_intent
+                    and universal_intent.declared
+                    and universal_intent.declared.goal
                     else None
                 ),
-                match_reasons=self._generate_match_reasons_from_aggregated(agg_result, universal_intent),
+                match_reasons=self._generate_match_reasons_from_aggregated(
+                    agg_result, universal_intent
+                ),
                 privacy_score=None,  # Will be calculated if enabled
                 ethical_alignment=None,
             )
             ranked_results.append(ranked_result)
 
         # Step 5: Enrich with dynamic data if needed (PURCHASE intent)
-        if universal_intent and universal_intent.declared and universal_intent.declared.goal:
+        if (
+            universal_intent
+            and universal_intent.declared
+            and universal_intent.declared.goal
+        ):
             goal_value = (
                 universal_intent.declared.goal.value
                 if hasattr(universal_intent.declared.goal, "value")
@@ -554,7 +637,9 @@ class UnifiedSearchService:
 
                 if ranking_response:
                     # Update scores from ranking response
-                    score_map = {r.url: r.final_score for r in ranking_response.ranked_urls}
+                    score_map = {
+                        r.url: r.final_score for r in ranking_response.ranked_urls
+                    }
                     for ranked_result in candidates_to_rank:
                         if ranked_result.url in score_map:
                             ranked_result.ranked_score = score_map[ranked_result.url]
@@ -612,29 +697,38 @@ class UnifiedSearchService:
     ) -> list[RankedSearchResult]:
         """
         Convert aggregated results to ranked results using enhanced multi-factor ranking.
-        
+
         This is the enhanced version with:
         1. Multi-factor scoring (semantic + authority + freshness + quality)
         2. Content filtering (trusted sources, low-quality filtering)
         3. Intent fallback for null goals
         4. Better null safety
-        
+
         Args:
             aggregated_results: Aggregated search results
             universal_intent: User intent (may be None)
             request: Original search request
-        
+
         Returns:
             List of ranked search results
         """
         from app.ranking.enhanced_ranker import EnhancedRanker
-        
+
         # Apply intent fallback if needed
-        if universal_intent is None or not universal_intent.declared or not universal_intent.declared.goal:
+        if (
+            universal_intent is None
+            or not universal_intent.declared
+            or not universal_intent.declared.goal
+        ):
             from app.extraction.intent_fallback import enhance_intent_with_fallback
-            universal_intent = enhance_intent_with_fallback(universal_intent, request.query)
-            logger.info(f"Applied intent fallback: goal={universal_intent.declared.goal.value if universal_intent.declared.goal else 'unknown'}")
-        
+
+            universal_intent = enhance_intent_with_fallback(
+                universal_intent, request.query
+            )
+            logger.info(
+                f"Applied intent fallback: goal={universal_intent.declared.goal.value if universal_intent.declared.goal else 'unknown'}"
+            )
+
         # Convert aggregated results to dict format for enhanced ranker
         candidates = []
         for agg in aggregated_results:
@@ -649,20 +743,28 @@ class UnifiedSearchService:
                 "publishedDate": agg.metadata.get("published_date"),
             }
             candidates.append(candidate)
-        
+
         # Use enhanced ranker
-        ranker = EnhancedRanker(config={
-            "weights": request.weights if hasattr(request, 'weights') and request.weights else None,
-            "filtering": {
-                "enable_domain_filter": True,
-                "enable_quality_filter": True,
-                "min_quality_threshold": 0.3,
-                "remove_duplicates": True,
+        ranker = EnhancedRanker(
+            config={
+                "weights": request.weights
+                if hasattr(request, "weights") and request.weights
+                else None,
+                "filtering": {
+                    "enable_domain_filter": True,
+                    "enable_quality_filter": True,
+                    "min_quality_threshold": 0.3,
+                    "remove_duplicates": True,
+                },
             }
-        })
-        
-        ranked = await ranker.rank_with_filters(candidates, universal_intent, request.options if hasattr(request, 'options') else None)
-        
+        )
+
+        ranked = await ranker.rank_with_filters(
+            candidates,
+            universal_intent,
+            request.options if hasattr(request, "options") else None,
+        )
+
         # Convert back to RankedSearchResult format
         ranked_results = []
         for idx, r in enumerate(ranked):
@@ -681,17 +783,23 @@ class UnifiedSearchService:
                 published_date=r.result.published_date,
                 price=r.result.price,
                 currency=None,
-                intent_goal=universal_intent.declared.goal.value if universal_intent.declared and universal_intent.declared.goal else None,
+                intent_goal=universal_intent.declared.goal.value
+                if universal_intent.declared and universal_intent.declared.goal
+                else None,
                 match_reasons=r.matchReasons,
                 privacy_score=None,
                 ethical_alignment=None,
             )
             ranked_results.append(ranked_result)
-        
-        logger.info(f"Enhanced ranking: {len(ranked_results)} results with multi-factor scoring")
+
+        logger.info(
+            f"Enhanced ranking: {len(ranked_results)} results with multi-factor scoring"
+        )
         return ranked_results
 
-    def _count_backend_distribution(self, results: list[RouterSearchResult]) -> dict[str, int]:
+    def _count_backend_distribution(
+        self, results: list[RouterSearchResult]
+    ) -> dict[str, int]:
         """Count results per backend"""
         distribution: dict[str, int] = {}
         for result in results:
@@ -703,7 +811,7 @@ class UnifiedSearchService:
         """
         Enrich search results with dynamic data (price, etc.) from Redis.
         If data is missing, enqueue a background task to scrape it.
-        
+
         Optimization: Uses persistent Redis cache and ARQ pool.
         """
         try:
@@ -727,10 +835,10 @@ class UnifiedSearchService:
                 if cached_data:
                     result.price = cached_data.get("price")
                     result.currency = cached_data.get("currency")
-                    
+
                     if "match_reasons" in cached_data:
                         result.match_reasons.extend(cached_data["match_reasons"])
-                    
+
                     logger.debug(f"Applied cached dynamic data for {url[:30]}...")
                 elif any(d in domain for d in dynamic_domains):
                     # 2. Enqueue background scrape if missing and dynamic domain
@@ -762,15 +870,15 @@ def get_unified_search_service() -> UnifiedSearchService:
 def _cached_extract_intent(query_hash: str, query: str, query_length: int):
     """
     Cached version of intent extraction.
-    
+
     Args:
         query_hash: MD5 hash of normalized query (for cache key)
         query: Original query string
         query_length: Length of query (for better cache discrimination)
-    
+
     Returns:
         Intent extraction result or None if failed
-    
+
     Performance:
         - Cache hit: <1ms (memory access only)
         - Cache miss: 30-50ms (ML inference)
@@ -794,74 +902,91 @@ def _cached_extract_intent(query_hash: str, query: str, query_length: int):
 def normalize_query(query: str) -> str:
     """
     Normalize query for consistent caching and better hit rates.
-    
+
     Normalization steps:
     1. Lowercase
     2. Strip whitespace
     3. Remove extra spaces
     4. Remove punctuation (except essential)
     5. Sort common query patterns
-    
+
     Examples:
         "Best laptop for programming" -> "best laptop programming"
         "How to learn Python?" -> "learn python"
         "Python vs Java comparison" -> "python java comparison"
     """
     import re
-    
+
     # Lowercase and strip
     normalized = query.lower().strip()
-    
+
     # Remove extra whitespace
-    normalized = ' '.join(normalized.split())
-    
+    normalized = " ".join(normalized.split())
+
     # Remove common stop words that don't affect intent
-    stop_words = {'how', 'to', 'what', 'is', 'are', 'the', 'a', 'an', 'for', 'in', 'on', 'at', 'with', 'by'}
+    stop_words = {
+        "how",
+        "to",
+        "what",
+        "is",
+        "are",
+        "the",
+        "a",
+        "an",
+        "for",
+        "in",
+        "on",
+        "at",
+        "with",
+        "by",
+    }
     words = [w for w in normalized.split() if w not in stop_words]
-    
+
     # Remove punctuation except hyphens and underscores
-    normalized = ' '.join(words)
-    normalized = re.sub(r'[^\w\s\-_]', '', normalized)
-    
+    normalized = " ".join(words)
+    normalized = re.sub(r"[^\w\s\-_]", "", normalized)
+
     # Remove double spaces
-    normalized = ' '.join(normalized.split())
-    
+    normalized = " ".join(normalized.split())
+
     return normalized
 
 
 def extract_intent_cached(query: str) -> Any:
     """
     Extract intent with multi-level caching for optimal performance.
-    
+
     Caching Strategy:
     1. L1 Cache: In-memory LRU (2000 entries, <1ms access)
     2. L2 Cache: Redis (optional, for distributed caching)
-    
+
     Performance Targets:
     - L1 hit: <1ms
     - L2 hit: 5-10ms
     - Miss: 30-50ms (ML inference)
     - Overall P95: <10ms with 80%+ hit rate
-    
+
     Args:
         query: Search query string
-    
+
     Returns:
         Intent extraction result or None
     """
     # Normalize query for consistent caching
     normalized_query = normalize_query(query)
-    
+
     # Generate cache key components
     query_hash = hashlib.md5(normalized_query.encode()).hexdigest()
     query_length = len(normalized_query)
-    
+
     # L1 Cache lookup (ultra-fast)
     result = _cached_extract_intent(query_hash, normalized_query, query_length)
-    
+
     if result:
-        logger.debug(f"Intent cache hit for: '{query[:50]}' (normalized: '{normalized_query[:50]}')")
-    
+        logger.debug(
+            f"Intent cache hit for: '{query[:50]}' (normalized: '{normalized_query[:50]}')"
+        )
+
     return result
 
 
@@ -869,35 +994,40 @@ def extract_intent_cached(query: str) -> Any:
 # Search Result Caching (Redis-backed)
 # ============================================================================
 
-async def _get_cached_search_response(self, cache_key: str) -> UnifiedSearchResponse | None:
+
+async def _get_cached_search_response(
+    self, cache_key: str
+) -> UnifiedSearchResponse | None:
     """
     Get cached search response from Redis using global cache.
-    
+
     Args:
         cache_key: Unique cache key for the search query
-        
+
     Returns:
         Cached UnifiedSearchResponse or None
     """
     try:
         from app.config.redis_cache import cache
-        
+
         cached_data = await cache.get(cache_key)
-        
+
         if cached_data:
             # Convert dict back to UnifiedSearchResponse
             return UnifiedSearchResponse(**cached_data)
-        
+
         return None
     except Exception as e:
         logger.debug(f"Cache retrieval failed: {e}")
         return None
 
 
-async def _cache_search_response(self, cache_key: str, response: UnifiedSearchResponse, ttl: int = 3600):
+async def _cache_search_response(
+    self, cache_key: str, response: UnifiedSearchResponse, ttl: int = 3600
+):
     """
     Cache search response in Redis using global cache.
-    
+
     Args:
         cache_key: Unique cache key for the search query
         response: UnifiedSearchResponse to cache
@@ -905,13 +1035,13 @@ async def _cache_search_response(self, cache_key: str, response: UnifiedSearchRe
     """
     try:
         from app.config.redis_cache import cache
-        
+
         # Convert response to dict (Pydantic v2 compatible)
         response_dict = response.model_dump()
-        
+
         # Store in Redis with TTL (using background task for performance)
         await cache.set(cache_key, response_dict, ttl=ttl, background=True)
-        
+
         logger.debug(f"Cached search response for: {response.query[:50]} (TTL={ttl}s)")
     except Exception as e:
         logger.debug(f"Cache storage failed: {e}")

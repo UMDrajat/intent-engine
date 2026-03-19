@@ -38,7 +38,13 @@ def call_api_endpoint(name, method, endpoint, payload=None, expected_status=200)
             return True, response
         else:
             tests_failed += 1
-            test_results.append((name, f"FAIL (Expected {expected_status}, got {response.status_code})", None))
+            test_results.append(
+                (
+                    name,
+                    f"FAIL (Expected {expected_status}, got {response.status_code})",
+                    None,
+                )
+            )
             return False, response
 
     except Exception as e:
@@ -56,7 +62,9 @@ def print_results():
         status_str = str(status)
         print(f"{name:<50} {status_str}")
     print("=" * 80)
-    print(f"\nTotal: {tests_passed + tests_failed} | Passed: {tests_passed} | Failed: {tests_failed}")
+    print(
+        f"\nTotal: {tests_passed + tests_failed} | Passed: {tests_passed} | Failed: {tests_failed}"
+    )
 
     if tests_failed == 0:
         print("\nAll tests passed!")
@@ -102,7 +110,9 @@ def main():
             "product_context": "search",
         },
     }
-    success, response = call_api_endpoint("Intent Extraction", "POST", "/extract-intent", intent_payload)
+    success, response = call_api_endpoint(
+        "Intent Extraction", "POST", "/extract-intent", intent_payload
+    )
     if success:
         data = response.json()
         intent = data.get("intent", {})
@@ -124,14 +134,18 @@ def main():
         "exclude_big_tech": True,
         "min_privacy_score": 0.5,
     }
-    success, response = call_api_endpoint("URL Ranking", "POST", "/rank-urls", url_ranking_payload)
+    success, response = call_api_endpoint(
+        "URL Ranking", "POST", "/rank-urls", url_ranking_payload
+    )
     if success:
         data = response.json()
         ranked_urls = data.get("ranked_urls", [])
         print(f"   Ranked {len(ranked_urls)} URLs")
         if ranked_urls:
             top_result = ranked_urls[0]
-            print(f"   Top result: {top_result.get('url', 'N/A')} (Score: {top_result.get('final_score', 0):.3f})")
+            print(
+                f"   Top result: {top_result.get('url', 'N/A')} (Score: {top_result.get('final_score', 0):.3f})"
+            )
 
     # Test 6: Service Recommendations
     print("\n6. Testing Service Recommendations (POST /recommend-services)")
@@ -147,13 +161,22 @@ def main():
             "declared": {
                 "query": "How to setup E2E encrypted email",
                 "goal": "learn",
-                "constraints": [{"type": "inclusion", "dimension": "platform", "value": "Android", "hardFilter": True}],
+                "constraints": [
+                    {
+                        "type": "inclusion",
+                        "dimension": "platform",
+                        "value": "Android",
+                        "hardFilter": True,
+                    }
+                ],
                 "negativePreferences": ["no big tech"],
                 "skillLevel": "intermediate",
             },
             "inferred": {
                 "useCases": ["learning"],
-                "ethicalSignals": [{"dimension": "privacy", "preference": "privacy-first"}],
+                "ethicalSignals": [
+                    {"dimension": "privacy", "preference": "privacy-first"}
+                ],
             },
         },
         "available_services": [
@@ -177,7 +200,9 @@ def main():
             },
         ],
     }
-    success, response = call_api_endpoint("Service Recommendations", "POST", "/recommend-services", service_payload)
+    success, response = call_api_endpoint(
+        "Service Recommendations", "POST", "/recommend-services", service_payload
+    )
     if success:
         data = response.json()
         recommendations = data.get("recommendations", [])
@@ -185,7 +210,9 @@ def main():
         if recommendations:
             for rec in recommendations[:3]:
                 svc = rec.get("service", {})
-                print(f"   - {svc.get('name', 'N/A')}: {rec.get('relevanceScore', 0):.3f}")
+                print(
+                    f"   - {svc.get('name', 'N/A')}: {rec.get('relevanceScore', 0):.3f}"
+                )
 
     # Test 7: Ad Matching
     print("\n7. Testing Ad Matching (POST /match-ads)")
@@ -207,7 +234,9 @@ def main():
             },
             "inferred": {
                 "useCases": ["learning"],
-                "ethicalSignals": [{"dimension": "privacy", "preference": "privacy-first"}],
+                "ethicalSignals": [
+                    {"dimension": "privacy", "preference": "privacy-first"}
+                ],
             },
             "expiresAt": future_time,
         },
@@ -224,7 +253,9 @@ def main():
         ],
         "config": {"topK": 5, "minThreshold": 0.4},
     }
-    success, response = call_api_endpoint("Ad Matching", "POST", "/match-ads", ad_matching_payload)
+    success, response = call_api_endpoint(
+        "Ad Matching", "POST", "/match-ads", ad_matching_payload
+    )
     if success:
         data = response.json()
         matched_ads = data.get("matched_ads", [])

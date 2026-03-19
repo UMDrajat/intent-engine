@@ -9,7 +9,9 @@ from playwright_stealth import stealth_async
 logger = logging.getLogger(__name__)
 
 # Common price patterns
-PRICE_PATTERN = re.compile(r"(\$|£|€|₹|Rs\.?\s?)\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)")
+PRICE_PATTERN = re.compile(
+    r"(\$|£|€|₹|Rs\.?\s?)\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)"
+)
 
 
 async def scrape_dynamic_product(url: str) -> dict[str, Any] | None:
@@ -37,7 +39,10 @@ async def scrape_dynamic_product(url: str) -> dict[str, Any] | None:
         await stealth_async(page)
 
         # Block heavy assets to save bandwidth and time
-        await page.route("**/*.{png,jpg,jpeg,gif,svg,mp4,webm,woff,woff2}", lambda route: route.abort())
+        await page.route(
+            "**/*.{png,jpg,jpeg,gif,svg,mp4,webm,woff,woff2}",
+            lambda route: route.abort(),
+        )
 
         try:
             logger.info(f"Dynamically scraping {url}...")

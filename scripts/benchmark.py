@@ -134,7 +134,9 @@ class PerformanceBenchmark:
                 times.append(elapsed)
                 result = response.json()
                 if i == 0:
-                    print(f"  Cache hit rate: {result.get('cache_hit_rate', 0) * 100:.1f}%")
+                    print(
+                        f"  Cache hit rate: {result.get('cache_hit_rate', 0) * 100:.1f}%"
+                    )
             else:
                 print(f"  Failed: {response.status_code}")
 

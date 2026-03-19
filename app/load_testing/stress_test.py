@@ -49,7 +49,9 @@ class StressTestSuite:
             "percent": psutil.virtual_memory().percent,
         }
 
-    async def test_concurrent_intent_extraction(self, concurrency: int = 100, duration: int = 60):
+    async def test_concurrent_intent_extraction(
+        self, concurrency: int = 100, duration: int = 60
+    ):
         """Test intent extraction under high concurrent load"""
         print(f"\n{'=' * 60}")
         print("Stress Test: Concurrent Intent Extraction")
@@ -83,12 +85,17 @@ class StressTestSuite:
                     payload = {
                         "product": "search",
                         "input": {"text": query},
-                        "context": {"sessionId": f"stress-{request_id}", "userLocale": "en-US"},
+                        "context": {
+                            "sessionId": f"stress-{request_id}",
+                            "userLocale": "en-US",
+                        },
                     }
 
                     request_start = time.time()
                     async with session.post(
-                        f"{self.base_url}/extract-intent", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/extract-intent",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
 
@@ -99,20 +106,28 @@ class StressTestSuite:
                             results["successful_requests"] += 1
                         else:
                             results["failed_requests"] += 1
-                            results["errors"].append(f"Request {request_id}: HTTP {response.status}")
+                            results["errors"].append(
+                                f"Request {request_id}: HTTP {response.status}"
+                            )
 
                 except TimeoutError as e:
                     results["total_requests"] += 1
                     results["failed_requests"] += 1
-                    results["errors"].append(f"Request {request_id}: Timeout - {str(e)}")
+                    results["errors"].append(
+                        f"Request {request_id}: Timeout - {str(e)}"
+                    )
                 except aiohttp.ClientError as e:
                     results["total_requests"] += 1
                     results["failed_requests"] += 1
-                    results["errors"].append(f"Request {request_id}: ClientError - {str(e)}")
+                    results["errors"].append(
+                        f"Request {request_id}: ClientError - {str(e)}"
+                    )
                 except Exception as e:
                     results["total_requests"] += 1
                     results["failed_requests"] += 1
-                    results["errors"].append(f"Request {request_id}: {type(e).__name__} - {str(e)}")
+                    results["errors"].append(
+                        f"Request {request_id}: {type(e).__name__} - {str(e)}"
+                    )
 
         async with aiohttp.ClientSession() as session:
             tasks = []
@@ -145,7 +160,9 @@ class StressTestSuite:
             # Wait for remaining tasks with timeout
             if tasks:
                 try:
-                    await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=10.0)
+                    await asyncio.wait_for(
+                        asyncio.gather(*tasks, return_exceptions=True), timeout=10.0
+                    )
                 except TimeoutError:
                     # FIX: Cancel remaining tasks gracefully
                     for task in tasks:
@@ -161,7 +178,9 @@ class StressTestSuite:
         # Calculate statistics
         if results["response_times"]:
             results["avg_response_time"] = statistics.mean(results["response_times"])
-            results["median_response_time"] = statistics.median(results["response_times"])
+            results["median_response_time"] = statistics.median(
+                results["response_times"]
+            )
             results["max_response_time"] = max(results["response_times"])
             # FIX: Prevent off-by-one error in percentile calculation
             sorted_times = sorted(results["response_times"])
@@ -192,7 +211,9 @@ class StressTestSuite:
                 }
 
                 try:
-                    async with session.post(f"{self.base_url}/extract-intent", json=payload) as response:
+                    async with session.post(
+                        f"{self.base_url}/extract-intent", json=payload
+                    ) as response:
                         await response.json()
                 except Exception as e:
                     print(f"Error on iteration {i}: {e}")
@@ -252,14 +273,18 @@ class StressTestSuite:
             for i in range(unique_queries):
                 payload = {
                     "product": "search",
-                    "input": {"text": f"unique query number {i} with different keywords"},
+                    "input": {
+                        "text": f"unique query number {i} with different keywords"
+                    },
                     "context": {"sessionId": f"cache-test-{i}", "userLocale": "en-US"},
                 }
 
                 start = time.time()
                 try:
                     async with session.post(
-                        f"{self.base_url}/extract-intent", json=payload, timeout=aiohttp.ClientTimeout(total=10)
+                        f"{self.base_url}/extract-intent",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=10),
                     ) as response:
                         await response.json()
                         times.append((time.time() - start) * 1000)
@@ -277,14 +302,18 @@ class StressTestSuite:
             for i in range(unique_queries):
                 payload = {
                     "product": "search",
-                    "input": {"text": f"unique query number {i} with different keywords"},
+                    "input": {
+                        "text": f"unique query number {i} with different keywords"
+                    },
                     "context": {"sessionId": f"cache-test-{i}", "userLocale": "en-US"},
                 }
 
                 start = time.time()
                 try:
                     async with session.post(
-                        f"{self.base_url}/extract-intent", json=payload, timeout=aiohttp.ClientTimeout(total=10)
+                        f"{self.base_url}/extract-intent",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=10),
                     ) as response:
                         await response.json()
                         times.append((time.time() - start) * 1000)
@@ -316,13 +345,18 @@ class StressTestSuite:
                 payload = {
                     "product": "search",
                     "input": {"text": query},
-                    "context": {"sessionId": f"cache-test-repeat-{i}", "userLocale": "en-US"},
+                    "context": {
+                        "sessionId": f"cache-test-repeat-{i}",
+                        "userLocale": "en-US",
+                    },
                 }
 
                 start = time.time()
                 try:
                     async with session.post(
-                        f"{self.base_url}/extract-intent", json=payload, timeout=aiohttp.ClientTimeout(total=10)
+                        f"{self.base_url}/extract-intent",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=10),
                     ) as response:
                         await response.json()
                         times.append((time.time() - start) * 1000)
@@ -330,7 +364,9 @@ class StressTestSuite:
                     continue
 
             results["repeated_queries"]["total"] = len(times)
-            results["repeated_queries"]["avg_time"] = statistics.mean(times) if times else 0
+            results["repeated_queries"]["avg_time"] = (
+                statistics.mean(times) if times else 0
+            )
 
         finally:
             # FIX: Idempotent session cleanup
@@ -353,22 +389,32 @@ class StressTestSuite:
         )
 
         print("\nCache Performance:")
-        print(f"  First pass avg (cold cache): {results['first_pass']['avg_time']:.2f}ms")
-        print(f"  Second pass avg (same queries): {results['second_pass']['avg_time']:.2f}ms")
+        print(
+            f"  First pass avg (cold cache): {results['first_pass']['avg_time']:.2f}ms"
+        )
+        print(
+            f"  Second pass avg (same queries): {results['second_pass']['avg_time']:.2f}ms"
+        )
         print(f"  Speedup (same queries): {speedup_second:.2f}x")
-        print(f"  Repeated common queries avg: {results['repeated_queries']['avg_time']:.2f}ms")
+        print(
+            f"  Repeated common queries avg: {results['repeated_queries']['avg_time']:.2f}ms"
+        )
         print(f"  Speedup (repeated queries): {speedup_repeated:.2f}x")
 
         if speedup_second > 1.5 or speedup_repeated > 2:
             print("  [OK] Cache working effectively")
         else:
             print("  [WARN] Cache may be full or not working optimally")
-            print("  [INFO] Note: /extract-intent uses rule-based extraction, not embeddings")
+            print(
+                "  [INFO] Note: /extract-intent uses rule-based extraction, not embeddings"
+            )
             print("  [INFO] Cache is used in /rank-results and /match-ads endpoints")
 
         return results
 
-    async def test_ranking_with_embeddings(self, concurrency: int = 30, duration: int = 20):
+    async def test_ranking_with_embeddings(
+        self, concurrency: int = 30, duration: int = 20
+    ):
         """Test ranking endpoint which uses embedding cache"""
         print(f"\n{'=' * 60}")
         print("Stress Test: Ranking with Embeddings (uses cache)")
@@ -385,9 +431,13 @@ class StressTestSuite:
             }
 
             try:
-                async with session.post(f"{self.base_url}/extract-intent", json=extract_payload) as response:
+                async with session.post(
+                    f"{self.base_url}/extract-intent", json=extract_payload
+                ) as response:
                     if response.status != 200:
-                        print(f"  [WARN] Failed to get valid intent: HTTP {response.status}")
+                        print(
+                            f"  [WARN] Failed to get valid intent: HTTP {response.status}"
+                        )
                         print("  [INFO] Skipping ranking test")
                         return {}
 
@@ -424,11 +474,17 @@ class StressTestSuite:
 
         async def make_request(session, request_id: int):
             try:
-                payload = {"intent": valid_intent, "candidates": sample_candidates, "options": {"numResults": 5}}
+                payload = {
+                    "intent": valid_intent,
+                    "candidates": sample_candidates,
+                    "options": {"numResults": 5},
+                }
 
                 request_start = time.time()
                 async with session.post(
-                    f"{self.base_url}/rank-results", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                    f"{self.base_url}/rank-results",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     elapsed = (time.time() - request_start) * 1000
 
@@ -439,7 +495,9 @@ class StressTestSuite:
                         results["successful_requests"] += 1
                     else:
                         results["failed_requests"] += 1
-                        results["errors"].append(f"Request {request_id}: HTTP {response.status}")
+                        results["errors"].append(
+                            f"Request {request_id}: HTTP {response.status}"
+                        )
 
             except Exception as e:
                 results["total_requests"] += 1
@@ -456,7 +514,9 @@ class StressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -468,7 +528,9 @@ class StressTestSuite:
 
         if results["response_times"]:
             results["avg_response_time"] = statistics.mean(results["response_times"])
-            results["median_response_time"] = statistics.median(results["response_times"])
+            results["median_response_time"] = statistics.median(
+                results["response_times"]
+            )
             results["max_response_time"] = max(results["response_times"])
             # FIX: Prevent off-by-one error in percentile calculation
             sorted_times = sorted(results["response_times"])
@@ -484,7 +546,9 @@ class StressTestSuite:
         print(f"  Total requests: {results['total_requests']}")
         print(f"  Successful: {results['successful_requests']}")
         print(f"  Failed: {results['failed_requests']}")
-        print(f"  Success rate: {(results['successful_requests'] / results['total_requests'] * 100):.1f}%")
+        print(
+            f"  Success rate: {(results['successful_requests'] / results['total_requests'] * 100):.1f}%"
+        )
         print(f"  Duration: {results['duration']:.2f}s")
         print(f"  RPS: {results['rps']:.2f}")
 
@@ -498,7 +562,9 @@ class StressTestSuite:
         print("\n  Memory Usage:")
         print(f"    Start: {results['start_memory']['rss_mb']:.1f} MB")
         print(f"    End: {results['end_memory']['rss_mb']:.1f} MB")
-        print(f"    Growth: {results['end_memory']['rss_mb'] - results['start_memory']['rss_mb']:.1f} MB")
+        print(
+            f"    Growth: {results['end_memory']['rss_mb'] - results['start_memory']['rss_mb']:.1f} MB"
+        )
 
         if results["errors"]:
             print(f"\n  [WARN] Errors ({len(results['errors'])}):")

@@ -125,7 +125,11 @@ def test_ad_matching():
     intent_data = response.json()
 
     # Now test ad matching with the extracted intent
-    ad_match_payload = {"intent": intent_data["intent"], "ad_inventory": [], "config": {"minThreshold": 0.4, "topK": 5}}
+    ad_match_payload = {
+        "intent": intent_data["intent"],
+        "ad_inventory": [],
+        "config": {"minThreshold": 0.4, "topK": 5},
+    }
 
     response = requests.post(f"{BASE_URL}/match-ads", json=ad_match_payload)
     assert response.status_code == 200

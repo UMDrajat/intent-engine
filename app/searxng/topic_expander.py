@@ -143,12 +143,28 @@ class ReliableTopicExpander:
             "related_topics": ["concurrency", "goroutines", "channels", "modules"],
         },
         "python": {
-            "keywords": ["python", "django", "flask", "fastapi", "pandas", "numpy", "pytorch"],
+            "keywords": [
+                "python",
+                "django",
+                "flask",
+                "fastapi",
+                "pandas",
+                "numpy",
+                "pytorch",
+            ],
             "patterns": [r"\bpython\b", r"\bdjango\b", r"\bflask\b", r"\bfastapi\b"],
             "validation": lambda t: (
-                "python" in t.lower() or any(lib in t.lower() for lib in ["django", "flask", "fastapi", "pandas"])
+                "python" in t.lower()
+                or any(
+                    lib in t.lower() for lib in ["django", "flask", "fastapi", "pandas"]
+                )
             ),
-            "related_topics": ["data science", "machine learning", "web development", "automation"],
+            "related_topics": [
+                "data science",
+                "machine learning",
+                "web development",
+                "automation",
+            ],
         },
         "web_dev": {
             "keywords": [
@@ -163,9 +179,25 @@ class ReliableTopicExpander:
                 "node.js",
                 "next.js",
             ],
-            "patterns": [r"\bjs\b", r"\breact\b", r"\bvue\b", r"\bangular\b", r"\bnode\.?js\b"],
+            "patterns": [
+                r"\bjs\b",
+                r"\breact\b",
+                r"\bvue\b",
+                r"\bangular\b",
+                r"\bnode\.?js\b",
+            ],
             "validation": lambda t: any(
-                kw in t.lower() for kw in ["javascript", "react", "vue", "angular", "css", "html", "node", "typescript"]
+                kw in t.lower()
+                for kw in [
+                    "javascript",
+                    "react",
+                    "vue",
+                    "angular",
+                    "css",
+                    "html",
+                    "node",
+                    "typescript",
+                ]
             ),
             "related_topics": ["frontend", "backend", "fullstack", "frameworks"],
         },
@@ -184,20 +216,55 @@ class ReliableTopicExpander:
                 "prometheus",
                 "grafana",
             ],
-            "patterns": [r"\bdocker\b", r"\bkubernetes\b", r"\bk8s\b", r"\baws\b", r"\bazure\b"],
+            "patterns": [
+                r"\bdocker\b",
+                r"\bkubernetes\b",
+                r"\bk8s\b",
+                r"\baws\b",
+                r"\bazure\b",
+            ],
             "validation": lambda t: any(
                 kw in t.lower()
-                for kw in ["docker", "kubernetes", "k8s", "ci/cd", "jenkins", "aws", "azure", "gcp", "terraform"]
+                for kw in [
+                    "docker",
+                    "kubernetes",
+                    "k8s",
+                    "ci/cd",
+                    "jenkins",
+                    "aws",
+                    "azure",
+                    "gcp",
+                    "terraform",
+                ]
             ),
             "related_topics": ["cloud", "infrastructure", "monitoring", "automation"],
         },
         "programming": {
-            "keywords": ["programming", "coding", "software", "algorithm", "data structure", "design pattern"],
+            "keywords": [
+                "programming",
+                "coding",
+                "software",
+                "algorithm",
+                "data structure",
+                "design pattern",
+            ],
             "patterns": [r"\bprogramming\b", r"\bcoding\b", r"\balgorithm\b"],
             "validation": lambda t: any(
-                kw in t.lower() for kw in ["programming", "coding", "software", "algorithm", "data structure"]
+                kw in t.lower()
+                for kw in [
+                    "programming",
+                    "coding",
+                    "software",
+                    "algorithm",
+                    "data structure",
+                ]
             ),
-            "related_topics": ["best practices", "clean code", "architecture", "testing"],
+            "related_topics": [
+                "best practices",
+                "clean code",
+                "architecture",
+                "testing",
+            ],
         },
         "rust": {
             "keywords": ["rust", "rustlang", "rust lang"],
@@ -210,6 +277,7 @@ class ReliableTopicExpander:
     def __init__(self, redis_url: str = None):
         # Use environment variable first (for aio container), then parameter, then default
         import os
+
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
         self.redis_client = None
         self.topics_key = "seed_discovery:topics"
@@ -273,7 +341,9 @@ class ReliableTopicExpander:
         if not self.redis_client:
             import redis.asyncio as redis
 
-            self.redis_client = redis.from_url(self.redis_url, encoding="utf-8", decode_responses=True)
+            self.redis_client = redis.from_url(
+                self.redis_url, encoding="utf-8", decode_responses=True
+            )
             logger.info(f"Connected to Redis for topic storage: {self.redis_url}")
 
     async def close(self):
@@ -292,11 +362,15 @@ class ReliableTopicExpander:
             stored_data = json.loads(stored_topics)
             self.default_topics = stored_data.get("topics", self.default_topics)
             self.stats = stored_data.get("stats", self.stats)
-            logger.info(f"Loaded {len(self.default_topics)} topic categories from Redis")
+            logger.info(
+                f"Loaded {len(self.default_topics)} topic categories from Redis"
+            )
         else:
             # Store default topics
             await self._persist_topics()
-            logger.info(f"Initialized {len(self.default_topics)} default topic categories")
+            logger.info(
+                f"Initialized {len(self.default_topics)} default topic categories"
+            )
 
     async def add_search_query(self, query: str):
         """
@@ -324,7 +398,9 @@ class ReliableTopicExpander:
         }
 
         # Add to query history with timestamp for time-decay analysis
-        await self.redis_client.zadd(self.query_history_key, {json.dumps(query_data): timestamp})
+        await self.redis_client.zadd(
+            self.query_history_key, {json.dumps(query_data): timestamp}
+        )
 
         # Update keyword frequency stats
         for keyword in keywords:
@@ -343,7 +419,9 @@ class ReliableTopicExpander:
         # Trim keyword stats (keep top 1000)
         await self.redis_client.zremrangebyrank(self.keyword_stats_key, 0, -1001)
 
-    async def get_expanded_topics(self, limit_per_category: int = 20) -> dict[str, list[str]]:
+    async def get_expanded_topics(
+        self, limit_per_category: int = 20
+    ) -> dict[str, list[str]]:
         """
         Get all topics with reliability checks.
 
@@ -363,7 +441,10 @@ class ReliableTopicExpander:
             await self._reliable_expansion()
 
         # Return limited topics
-        return {cat: topics[:limit_per_category] for cat, topics in self.default_topics.items()}
+        return {
+            cat: topics[:limit_per_category]
+            for cat, topics in self.default_topics.items()
+        }
 
     async def _reliable_expansion(self):
         """
@@ -402,7 +483,10 @@ class ReliableTopicExpander:
             # Validate and score each topic
             for topic in new_topics:
                 confidence = self._calculate_confidence_score(
-                    topic=topic, category=category, frequency=frequency, recency_score=recency_score
+                    topic=topic,
+                    category=category,
+                    frequency=frequency,
+                    recency_score=recency_score,
                 )
 
                 # Only add high-confidence topics
@@ -429,7 +513,9 @@ class ReliableTopicExpander:
             List of (keyword, frequency, recency_score) tuples
         """
         # Get recent queries (last 24 hours)
-        cutoff_time = (datetime.utcnow() - timedelta(hours=self.CONFIG["trending_window_hours"])).timestamp()
+        cutoff_time = (
+            datetime.utcnow() - timedelta(hours=self.CONFIG["trending_window_hours"])
+        ).timestamp()
 
         recent_queries = await self.redis_client.zrangebyscore(
             self.query_history_key, cutoff_time, "+inf", withscores=True
@@ -447,15 +533,22 @@ class ReliableTopicExpander:
 
             # Calculate recency weight (newer = higher weight)
             age_hours = (datetime.utcnow().timestamp() - timestamp) / 3600
-            recency_weight = max(0.1, 1.0 - (age_hours / self.CONFIG["trending_window_hours"]))
+            recency_weight = max(
+                0.1, 1.0 - (age_hours / self.CONFIG["trending_window_hours"])
+            )
 
             for keyword in keywords:
                 keyword_scores[keyword] += recency_weight
 
         # Return sorted by score
-        return [(keyword, int(score), score / len(recent_queries)) for keyword, score in keyword_scores.most_common(50)]
+        return [
+            (keyword, int(score), score / len(recent_queries))
+            for keyword, score in keyword_scores.most_common(50)
+        ]
 
-    def _calculate_confidence_score(self, topic: str, category: str, frequency: int, recency_score: float) -> float:
+    def _calculate_confidence_score(
+        self, topic: str, category: str, frequency: int, recency_score: float
+    ) -> float:
         """
         Calculate confidence score for a topic (0-1).
 
@@ -480,7 +573,12 @@ class ReliableTopicExpander:
         quality_score = self._calculate_topic_quality(topic)
 
         # Weighted average
-        confidence = freq_score * 0.40 + recency * 0.30 + category_match * 0.20 + quality_score * 0.10
+        confidence = (
+            freq_score * 0.40
+            + recency * 0.30
+            + category_match * 0.20
+            + quality_score * 0.10
+        )
 
         return confidence
 

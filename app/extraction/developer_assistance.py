@@ -12,7 +12,12 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.core.schema import ErrorType, ProgrammingContext, ProgrammingLanguage, UniversalIntent
+from app.core.schema import (
+    ErrorType,
+    ProgrammingContext,
+    ProgrammingLanguage,
+    UniversalIntent,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -91,7 +96,9 @@ class DynamicResearchPlanner:
 
         # Base steps
         if context.hasStackTrace:
-            steps.append("Analyze the stack trace from bottom to top to identify your code's entry point.")
+            steps.append(
+                "Analyze the stack trace from bottom to top to identify your code's entry point."
+            )
 
         # Error specific steps
         if context.errorType == ErrorType.IMPORT_ERROR:
@@ -126,14 +133,22 @@ class DynamicResearchPlanner:
             steps.append("Check if your model migrations are up to date.")
 
         if not steps:
-            steps.append("Reproduce the error with the minimal amount of code possible.")
+            steps.append(
+                "Reproduce the error with the minimal amount of code possible."
+            )
             steps.append("Add print/log statements around the suspected failure point.")
 
         return steps
 
-    def _generate_search_queries(self, context: ProgrammingContext, query: str) -> dict[str, str]:
+    def _generate_search_queries(
+        self, context: ProgrammingContext, query: str
+    ) -> dict[str, str]:
         queries = {}
-        lang = context.language.value if context.language != ProgrammingLanguage.UNKNOWN else ""
+        lang = (
+            context.language.value
+            if context.language != ProgrammingLanguage.UNKNOWN
+            else ""
+        )
         error = context.errorMessage or ""
         framework = context.framework or ""
 
@@ -152,9 +167,13 @@ class DynamicResearchPlanner:
 
         # Documentation query
         if framework:
-            queries["Official Docs"] = f"{framework} {context.errorType.value} documentation".strip()
+            queries["Official Docs"] = (
+                f"{framework} {context.errorType.value} documentation".strip()
+            )
         elif lang:
-            queries["Official Docs"] = f"{lang} {context.errorType.value} manual".strip()
+            queries["Official Docs"] = (
+                f"{lang} {context.errorType.value} manual".strip()
+            )
 
         return queries
 
@@ -162,11 +181,15 @@ class DynamicResearchPlanner:
         concepts = []
 
         if context.errorType == ErrorType.NULL_REFERENCE:
-            concepts.extend(["Null Safety", "Optional Chaining", "Defensive Programming"])
+            concepts.extend(
+                ["Null Safety", "Optional Chaining", "Defensive Programming"]
+            )
         elif context.errorType == ErrorType.MEMORY_ERROR:
             concepts.extend(["Memory Leak", "Garbage Collection", "Heap vs Stack"])
         elif context.errorType == ErrorType.IMPORT_ERROR:
-            concepts.extend(["Dependency Management", "Module Resolution", "Virtual Environments"])
+            concepts.extend(
+                ["Dependency Management", "Module Resolution", "Virtual Environments"]
+            )
 
         if context.framework == "React":
             concepts.append("React Lifecycle")
@@ -408,7 +431,9 @@ class DeveloperAssistanceEngine:
 
         # Generate dynamic research plan
         query = intent.declared.query or ""
-        response.research_plan = self.research_planner.generate_plan(programming_context, query)
+        response.research_plan = self.research_planner.generate_plan(
+            programming_context, query
+        )
 
         # Add suggestions based on error type
         if programming_context.errorType in self.error_solutions:
@@ -424,10 +449,14 @@ class DeveloperAssistanceEngine:
 
         # Add recommended resources based on language
         if programming_context.language in self.language_resources:
-            response.recommended_resources = self.language_resources[programming_context.language]
+            response.recommended_resources = self.language_resources[
+                programming_context.language
+            ]
 
         # Add language-specific suggestions
-        response.suggestions.extend(self._get_language_specific_suggestions(programming_context))
+        response.suggestions.extend(
+            self._get_language_specific_suggestions(programming_context)
+        )
 
         return response
 
@@ -443,21 +472,30 @@ class DeveloperAssistanceEngine:
                 RelatedError(
                     error_name="IndentationError",
                     common_causes=["Mixed tabs and spaces", "Inconsistent indentation"],
-                    typical_solutions=["Use consistent indentation", "Configure editor"],
+                    typical_solutions=[
+                        "Use consistent indentation",
+                        "Configure editor",
+                    ],
                     documentation_url="https://docs.python.org/3/reference/compound_stmts.html",
                 ),
             ],
             ErrorType.TYPE_ERROR: [
                 RelatedError(
                     error_name="AttributeError",
-                    common_causes=["Calling method on wrong type", "None has no attribute"],
+                    common_causes=[
+                        "Calling method on wrong type",
+                        "None has no attribute",
+                    ],
                     typical_solutions=["Check object type", "Add null checks"],
                 ),
             ],
             ErrorType.NULL_REFERENCE: [
                 RelatedError(
                     error_name="TypeError: Cannot read property",
-                    common_causes=["Accessing property of undefined", "Missing initialization"],
+                    common_causes=[
+                        "Accessing property of undefined",
+                        "Missing initialization",
+                    ],
                     typical_solutions=["Add existence checks", "Use optional chaining"],
                 ),
             ],

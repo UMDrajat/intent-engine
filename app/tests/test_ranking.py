@@ -5,10 +5,21 @@ Unit tests for the intent_ranker module
 import copy
 import unittest
 
-from app.core.schema import (Constraint, ConstraintType, DeclaredIntent,
-                         EthicalDimension, EthicalSignal, Frequency,
-                         InferredIntent, Recency, SkillLevel, TemporalHorizon,
-                         TemporalIntent, UniversalIntent, UseCase)
+from app.core.schema import (
+    Constraint,
+    ConstraintType,
+    DeclaredIntent,
+    EthicalDimension,
+    EthicalSignal,
+    Frequency,
+    InferredIntent,
+    Recency,
+    SkillLevel,
+    TemporalHorizon,
+    TemporalIntent,
+    UniversalIntent,
+    UseCase,
+)
 from app.ranking.ranker import RankingRequest, SearchResult, rank_results
 
 
@@ -27,7 +38,12 @@ class TestIntentRanker(unittest.TestCase):
             declared=DeclaredIntent(
                 query="How to set up E2E encrypted email on Android, no big tech solutions",
                 constraints=[
-                    Constraint(type=ConstraintType.INCLUSION, dimension="platform", value="Android", hardFilter=True),
+                    Constraint(
+                        type=ConstraintType.INCLUSION,
+                        dimension="platform",
+                        value="Android",
+                        hardFilter=True,
+                    ),
                     Constraint(
                         type=ConstraintType.EXCLUSION,
                         dimension="provider",
@@ -47,12 +63,19 @@ class TestIntentRanker(unittest.TestCase):
             inferred=InferredIntent(
                 useCases=[UseCase.LEARNING, UseCase.TROUBLESHOOTING],
                 temporalIntent=TemporalIntent(
-                    horizon=TemporalHorizon.TODAY, recency=Recency.RECENT, frequency=Frequency.ONEOFF
+                    horizon=TemporalHorizon.TODAY,
+                    recency=Recency.RECENT,
+                    frequency=Frequency.ONEOFF,
                 ),
                 resultType=None,
                 ethicalSignals=[
-                    EthicalSignal(dimension=EthicalDimension.PRIVACY, preference="privacy-first"),
-                    EthicalSignal(dimension=EthicalDimension.OPENNESS, preference="open-source_preferred"),
+                    EthicalSignal(
+                        dimension=EthicalDimension.PRIVACY, preference="privacy-first"
+                    ),
+                    EthicalSignal(
+                        dimension=EthicalDimension.OPENNESS,
+                        preference="open-source_preferred",
+                    ),
                 ],
             ),
         )
@@ -83,7 +106,9 @@ class TestIntentRanker(unittest.TestCase):
             tags=["iOS", "Email", "Setup", "Guide"],
         )
 
-        request = RankingRequest(intent=self.sample_intent, candidates=[passing_candidate, failing_candidate])
+        request = RankingRequest(
+            intent=self.sample_intent, candidates=[passing_candidate, failing_candidate]
+        )
 
         response = rank_results(request)
 
@@ -115,7 +140,9 @@ class TestIntentRanker(unittest.TestCase):
             tags=["Android", "Email", "Google"],
         )
 
-        request = RankingRequest(intent=self.sample_intent, candidates=[passing_candidate, failing_candidate])
+        request = RankingRequest(
+            intent=self.sample_intent, candidates=[passing_candidate, failing_candidate]
+        )
 
         response = rank_results(request)
 
@@ -155,7 +182,10 @@ class TestIntentRanker(unittest.TestCase):
             complexity="advanced",
         )
 
-        request = RankingRequest(intent=self.sample_intent, candidates=[relevant_candidate, less_relevant_candidate])
+        request = RankingRequest(
+            intent=self.sample_intent,
+            candidates=[relevant_candidate, less_relevant_candidate],
+        )
 
         response = rank_results(request)
 
@@ -197,7 +227,9 @@ class TestIntentRanker(unittest.TestCase):
             ),
         ]
 
-        request = RankingRequest(intent=self.sample_intent, candidates=violating_candidates)
+        request = RankingRequest(
+            intent=self.sample_intent, candidates=violating_candidates
+        )
 
         response = rank_results(request)
 
@@ -221,7 +253,9 @@ class TestIntentRanker(unittest.TestCase):
             complexity="intermediate",
         )
 
-        request = RankingRequest(intent=self.sample_intent, candidates=[partial_match_candidate])
+        request = RankingRequest(
+            intent=self.sample_intent, candidates=[partial_match_candidate]
+        )
 
         response = rank_results(request)
 
@@ -248,7 +282,9 @@ class TestIntentRanker(unittest.TestCase):
             complexity="intermediate",
         )
 
-        request = RankingRequest(intent=self.sample_intent, candidates=[relevant_candidate])
+        request = RankingRequest(
+            intent=self.sample_intent, candidates=[relevant_candidate]
+        )
 
         response = rank_results(request)
 
@@ -269,7 +305,10 @@ class TestIntentRanker(unittest.TestCase):
             ]
             for reason in reasons
         )
-        self.assertTrue(expected_reasons_present, f"Expected at least one of the known reasons, got: {reasons}")
+        self.assertTrue(
+            expected_reasons_present,
+            f"Expected at least one of the known reasons, got: {reasons}",
+        )
 
 
 if __name__ == "__main__":

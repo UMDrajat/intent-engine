@@ -150,7 +150,9 @@ class ComprehensiveStressTestSuite:
             "system_percent": psutil.virtual_memory().percent,
         }
 
-    async def test_intent_extraction(self, concurrency: int = 50, duration: int = 30) -> TestResults:
+    async def test_intent_extraction(
+        self, concurrency: int = 50, duration: int = 30
+    ) -> TestResults:
         """Stress test intent extraction endpoint"""
         print(f"\n{'=' * 70}")
         print("STRESS TEST: Intent Extraction")
@@ -166,12 +168,17 @@ class ComprehensiveStressTestSuite:
                 payload = {
                     "product": "search",
                     "input": {"text": query},
-                    "context": {"sessionId": f"{self.session_id}-{request_id}", "userLocale": "en-US"},
+                    "context": {
+                        "sessionId": f"{self.session_id}-{request_id}",
+                        "userLocale": "en-US",
+                    },
                 }
 
                 request_start = time.time()
                 async with session.post(
-                    f"{self.base_url}/extract-intent", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                    f"{self.base_url}/extract-intent",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     elapsed = (time.time() - request_start) * 1000
                     results.total_requests += 1
@@ -204,7 +211,9 @@ class ComprehensiveStressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -218,7 +227,9 @@ class ComprehensiveStressTestSuite:
         self.all_results.append(results)
         return results
 
-    async def test_url_ranking(self, concurrency: int = 50, duration: int = 30) -> TestResults:
+    async def test_url_ranking(
+        self, concurrency: int = 50, duration: int = 30
+    ) -> TestResults:
         """Stress test URL ranking endpoint"""
         print(f"\n{'=' * 70}")
         print("STRESS TEST: URL Ranking")
@@ -240,13 +251,20 @@ class ComprehensiveStressTestSuite:
                     "options": {
                         "exclude_big_tech": random.choice([True, False]),
                         "min_privacy_score": random.choice([0.0, 0.3, 0.5, 0.7]),
-                        "weights": {"relevance": 0.40, "privacy": 0.30, "quality": 0.20, "ethics": 0.10},
+                        "weights": {
+                            "relevance": 0.40,
+                            "privacy": 0.30,
+                            "quality": 0.20,
+                            "ethics": 0.10,
+                        },
                     },
                 }
 
                 request_start = time.time()
                 async with session.post(
-                    f"{self.base_url}/rank-urls", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                    f"{self.base_url}/rank-urls",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     elapsed = (time.time() - request_start) * 1000
                     results.total_requests += 1
@@ -273,7 +291,9 @@ class ComprehensiveStressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -287,7 +307,9 @@ class ComprehensiveStressTestSuite:
         self.all_results.append(results)
         return results
 
-    async def test_rank_results(self, concurrency: int = 50, duration: int = 30) -> TestResults:
+    async def test_rank_results(
+        self, concurrency: int = 50, duration: int = 30
+    ) -> TestResults:
         """Stress test result ranking endpoint"""
         print(f"\n{'=' * 70}")
         print("STRESS TEST: Result Ranking")
@@ -306,16 +328,23 @@ class ComprehensiveStressTestSuite:
                 intent_payload = {
                     "product": "search",
                     "input": {"text": query},
-                    "context": {"sessionId": f"{self.session_id}-{request_id}", "userLocale": "en-US"},
+                    "context": {
+                        "sessionId": f"{self.session_id}-{request_id}",
+                        "userLocale": "en-US",
+                    },
                 }
 
                 async with session.post(
-                    f"{self.base_url}/extract-intent", json=intent_payload, timeout=aiohttp.ClientTimeout(total=10)
+                    f"{self.base_url}/extract-intent",
+                    json=intent_payload,
+                    timeout=aiohttp.ClientTimeout(total=10),
                 ) as intent_response:
                     if intent_response.status != 200:
                         results.total_requests += 1
                         results.failed_requests += 1
-                        results.errors.append(f"Intent extraction failed: HTTP {intent_response.status}")
+                        results.errors.append(
+                            f"Intent extraction failed: HTTP {intent_response.status}"
+                        )
                         return
 
                     intent_data = await intent_response.json()
@@ -342,7 +371,9 @@ class ComprehensiveStressTestSuite:
 
                 request_start = time.time()
                 async with session.post(
-                    f"{self.base_url}/rank-results", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                    f"{self.base_url}/rank-results",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     elapsed = (time.time() - request_start) * 1000
                     results.total_requests += 1
@@ -369,7 +400,9 @@ class ComprehensiveStressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -383,7 +416,9 @@ class ComprehensiveStressTestSuite:
         self.all_results.append(results)
         return results
 
-    async def test_ad_matching(self, concurrency: int = 50, duration: int = 30) -> TestResults:
+    async def test_ad_matching(
+        self, concurrency: int = 50, duration: int = 30
+    ) -> TestResults:
         """Stress test ad matching endpoint"""
         print(f"\n{'=' * 70}")
         print("STRESS TEST: Ad Matching")
@@ -402,16 +437,23 @@ class ComprehensiveStressTestSuite:
                 intent_payload = {
                     "product": "search",
                     "input": {"text": query},
-                    "context": {"sessionId": f"{self.session_id}-{request_id}", "userLocale": "en-US"},
+                    "context": {
+                        "sessionId": f"{self.session_id}-{request_id}",
+                        "userLocale": "en-US",
+                    },
                 }
 
                 async with session.post(
-                    f"{self.base_url}/extract-intent", json=intent_payload, timeout=aiohttp.ClientTimeout(total=10)
+                    f"{self.base_url}/extract-intent",
+                    json=intent_payload,
+                    timeout=aiohttp.ClientTimeout(total=10),
                 ) as intent_response:
                     if intent_response.status != 200:
                         results.total_requests += 1
                         results.failed_requests += 1
-                        results.errors.append(f"Intent extraction failed: HTTP {intent_response.status}")
+                        results.errors.append(
+                            f"Intent extraction failed: HTTP {intent_response.status}"
+                        )
                         return
 
                     intent_data = await intent_response.json()
@@ -428,17 +470,28 @@ class ComprehensiveStressTestSuite:
                             "targetingConstraints": {},
                             "forbiddenDimensions": [],
                             "qualityScore": random.uniform(0.6, 0.95),
-                            "ethicalTags": random.sample(["privacy", "quality", "open-source", "sustainable"], k=2),
+                            "ethicalTags": random.sample(
+                                ["privacy", "quality", "open-source", "sustainable"],
+                                k=2,
+                            ),
                             "advertiser": f"advertiser-{i}",
-                            "creative_format": random.choice(["banner", "native", "video"]),
+                            "creative_format": random.choice(
+                                ["banner", "native", "video"]
+                            ),
                         }
                     )
 
-                payload = {"intent": intent, "ad_inventory": ads, "config": {"minThreshold": 0.3, "topK": 5}}
+                payload = {
+                    "intent": intent,
+                    "ad_inventory": ads,
+                    "config": {"minThreshold": 0.3, "topK": 5},
+                }
 
                 request_start = time.time()
                 async with session.post(
-                    f"{self.base_url}/match-ads", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                    f"{self.base_url}/match-ads",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     elapsed = (time.time() - request_start) * 1000
                     results.total_requests += 1
@@ -465,7 +518,9 @@ class ComprehensiveStressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -479,7 +534,9 @@ class ComprehensiveStressTestSuite:
         self.all_results.append(results)
         return results
 
-    async def test_service_recommendation(self, concurrency: int = 50, duration: int = 30) -> TestResults:
+    async def test_service_recommendation(
+        self, concurrency: int = 50, duration: int = 30
+    ) -> TestResults:
         """Stress test service recommendation endpoint"""
         print(f"\n{'=' * 70}")
         print("STRESS TEST: Service Recommendation")
@@ -498,16 +555,23 @@ class ComprehensiveStressTestSuite:
                 intent_payload = {
                     "product": "search",
                     "input": {"text": query},
-                    "context": {"sessionId": f"{self.session_id}-{request_id}", "userLocale": "en-US"},
+                    "context": {
+                        "sessionId": f"{self.session_id}-{request_id}",
+                        "userLocale": "en-US",
+                    },
                 }
 
                 async with session.post(
-                    f"{self.base_url}/extract-intent", json=intent_payload, timeout=aiohttp.ClientTimeout(total=10)
+                    f"{self.base_url}/extract-intent",
+                    json=intent_payload,
+                    timeout=aiohttp.ClientTimeout(total=10),
                 ) as intent_response:
                     if intent_response.status != 200:
                         results.total_requests += 1
                         results.failed_requests += 1
-                        results.errors.append(f"Intent extraction failed: HTTP {intent_response.status}")
+                        results.errors.append(
+                            f"Intent extraction failed: HTTP {intent_response.status}"
+                        )
                         return
 
                     intent_data = await intent_response.json()
@@ -548,7 +612,9 @@ class ComprehensiveStressTestSuite:
 
                 request_start = time.time()
                 async with session.post(
-                    f"{self.base_url}/recommend-services", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                    f"{self.base_url}/recommend-services",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     elapsed = (time.time() - request_start) * 1000
                     results.total_requests += 1
@@ -575,7 +641,9 @@ class ComprehensiveStressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -589,7 +657,9 @@ class ComprehensiveStressTestSuite:
         self.all_results.append(results)
         return results
 
-    async def test_campaign_management(self, concurrency: int = 20, duration: int = 30) -> TestResults:
+    async def test_campaign_management(
+        self, concurrency: int = 20, duration: int = 30
+    ) -> TestResults:
         """Stress test campaign management endpoints"""
         print(f"\n{'=' * 70}")
         print("STRESS TEST: Campaign Management")
@@ -608,7 +678,8 @@ class ComprehensiveStressTestSuite:
                 if operation == "list":
                     request_start = time.time()
                     async with session.get(
-                        f"{self.base_url}/campaigns", timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/campaigns",
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
                         results.total_requests += 1
@@ -633,7 +704,9 @@ class ComprehensiveStressTestSuite:
 
                     request_start = time.time()
                     async with session.post(
-                        f"{self.base_url}/campaigns", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/campaigns",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
                         results.total_requests += 1
@@ -649,7 +722,8 @@ class ComprehensiveStressTestSuite:
                     campaign_id = random.randint(1, 100)
                     request_start = time.time()
                     async with session.get(
-                        f"{self.base_url}/campaigns/{campaign_id}", timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/campaigns/{campaign_id}",
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
                         results.total_requests += 1
@@ -677,7 +751,9 @@ class ComprehensiveStressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -691,7 +767,9 @@ class ComprehensiveStressTestSuite:
         self.all_results.append(results)
         return results
 
-    async def test_reporting_endpoints(self, concurrency: int = 20, duration: int = 30) -> TestResults:
+    async def test_reporting_endpoints(
+        self, concurrency: int = 20, duration: int = 30
+    ) -> TestResults:
         """Stress test reporting endpoints"""
         print(f"\n{'=' * 70}")
         print("STRESS TEST: Reporting Endpoints")
@@ -709,7 +787,8 @@ class ComprehensiveStressTestSuite:
                 if operation == "campaign_performance":
                     request_start = time.time()
                     async with session.get(
-                        f"{self.base_url}/reports/campaign-performance", timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/reports/campaign-performance",
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
                         results.total_requests += 1
@@ -736,7 +815,9 @@ class ComprehensiveStressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -769,7 +850,9 @@ class ComprehensiveStressTestSuite:
                 }
 
                 try:
-                    async with session.post(f"{self.base_url}/extract-intent", json=payload) as response:
+                    async with session.post(
+                        f"{self.base_url}/extract-intent", json=payload
+                    ) as response:
                         await response.json()
                         successful += 1
                 except Exception:
@@ -801,7 +884,9 @@ class ComprehensiveStressTestSuite:
             print(f"  Initial: {first:.1f} MB")
             print(f"  Final: {last:.1f} MB")
             print(f"  Growth: {growth:.1f} MB")
-            print(f"  Growth per 100 requests: {growth / len(memory_samples) * 100:.2f} MB")
+            print(
+                f"  Growth per 100 requests: {growth / len(memory_samples) * 100:.2f} MB"
+            )
 
             if growth > 50:
                 print("  [WARNING] Potential memory leak detected!")
@@ -810,7 +895,9 @@ class ComprehensiveStressTestSuite:
 
         return analysis
 
-    async def test_concurrent_all_endpoints(self, concurrency: int = 100, duration: int = 60) -> TestResults:
+    async def test_concurrent_all_endpoints(
+        self, concurrency: int = 100, duration: int = 60
+    ) -> TestResults:
         """Stress test all endpoints simultaneously"""
         print(f"\n{'=' * 70}")
         print("STRESS TEST: All Endpoints Combined")
@@ -825,7 +912,13 @@ class ComprehensiveStressTestSuite:
             try:
                 query = self.test_queries[request_id % len(self.test_queries)]
                 endpoint = random.choice(
-                    ["extract-intent", "rank-urls", "match-ads", "recommend-services", "campaigns"]
+                    [
+                        "extract-intent",
+                        "rank-urls",
+                        "match-ads",
+                        "recommend-services",
+                        "campaigns",
+                    ]
                 )
 
                 request_start = time.time()
@@ -834,10 +927,15 @@ class ComprehensiveStressTestSuite:
                     payload = {
                         "product": "search",
                         "input": {"text": query},
-                        "context": {"sessionId": f"{self.session_id}-{request_id}", "userLocale": "en-US"},
+                        "context": {
+                            "sessionId": f"{self.session_id}-{request_id}",
+                            "userLocale": "en-US",
+                        },
                     }
                     async with session.post(
-                        f"{self.base_url}/{endpoint}", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/{endpoint}",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
                         results.total_requests += 1
@@ -851,14 +949,18 @@ class ComprehensiveStressTestSuite:
                 elif endpoint == "rank-urls":
                     payload = {
                         "query": query,
-                        "urls": random.sample(self.test_urls, min(10, len(self.test_urls))),
+                        "urls": random.sample(
+                            self.test_urls, min(10, len(self.test_urls))
+                        ),
                         "options": {
                             "exclude_big_tech": random.choice([True, False]),
                             "min_privacy_score": random.choice([0.0, 0.3, 0.5, 0.7]),
                         },
                     }
                     async with session.post(
-                        f"{self.base_url}/{endpoint}", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/{endpoint}",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
                         results.total_requests += 1
@@ -874,10 +976,15 @@ class ComprehensiveStressTestSuite:
                     intent_payload = {
                         "product": "search",
                         "input": {"text": query},
-                        "context": {"sessionId": f"{self.session_id}-{request_id}", "userLocale": "en-US"},
+                        "context": {
+                            "sessionId": f"{self.session_id}-{request_id}",
+                            "userLocale": "en-US",
+                        },
                     }
                     async with session.post(
-                        f"{self.base_url}/extract-intent", json=intent_payload, timeout=aiohttp.ClientTimeout(total=10)
+                        f"{self.base_url}/extract-intent",
+                        json=intent_payload,
+                        timeout=aiohttp.ClientTimeout(total=10),
                     ) as intent_response:
                         if intent_response.status != 200:
                             results.total_requests += 1
@@ -900,7 +1007,11 @@ class ComprehensiveStressTestSuite:
                             }
                             for i in range(random.randint(3, 8))
                         ]
-                        payload = {"intent": intent, "ad_inventory": ads, "config": {"minThreshold": 0.3, "topK": 5}}
+                        payload = {
+                            "intent": intent,
+                            "ad_inventory": ads,
+                            "config": {"minThreshold": 0.3, "topK": 5},
+                        }
                     else:  # recommend-services
                         payload = {
                             "intent": intent,
@@ -921,7 +1032,9 @@ class ComprehensiveStressTestSuite:
                         }
 
                     async with session.post(
-                        f"{self.base_url}/{endpoint}", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/{endpoint}",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
                         results.total_requests += 1
@@ -934,7 +1047,8 @@ class ComprehensiveStressTestSuite:
 
                 else:  # campaigns (GET)
                     async with session.get(
-                        f"{self.base_url}/{endpoint}", timeout=aiohttp.ClientTimeout(total=30)
+                        f"{self.base_url}/{endpoint}",
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         elapsed = (time.time() - request_start) * 1000
                         results.total_requests += 1
@@ -960,7 +1074,9 @@ class ComprehensiveStressTestSuite:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -1011,7 +1127,9 @@ class ComprehensiveStressTestSuite:
             "summary": {
                 "total_tests": len(self.all_results),
                 "total_requests": sum(r.total_requests for r in self.all_results),
-                "total_successful": sum(r.successful_requests for r in self.all_results),
+                "total_successful": sum(
+                    r.successful_requests for r in self.all_results
+                ),
                 "total_failed": sum(r.failed_requests for r in self.all_results),
                 "overall_success_rate": (
                     sum(r.successful_requests for r in self.all_results)
@@ -1020,8 +1138,12 @@ class ComprehensiveStressTestSuite:
                     if self.all_results
                     else 0
                 ),
-                "total_duration_seconds": sum(r.duration_seconds for r in self.all_results),
-                "avg_rps": sum(r.rps for r in self.all_results) / len(self.all_results) if self.all_results else 0,
+                "total_duration_seconds": sum(
+                    r.duration_seconds for r in self.all_results
+                ),
+                "avg_rps": sum(r.rps for r in self.all_results) / len(self.all_results)
+                if self.all_results
+                else 0,
             },
             "tests": [asdict(r) for r in self.all_results],
         }
@@ -1045,26 +1167,38 @@ class ComprehensiveStressTestSuite:
         """Run all stress tests"""
         print("\n" + "=" * 70)
         print("INTENT ENGINE COMPREHENSIVE STRESS TEST SUITE")
-        print(f"Configuration: Concurrency={concurrency}, Duration={duration}s per test")
+        print(
+            f"Configuration: Concurrency={concurrency}, Duration={duration}s per test"
+        )
         print("=" * 70)
 
         try:
             # Core endpoint tests
-            await self.test_intent_extraction(concurrency=concurrency, duration=duration)
+            await self.test_intent_extraction(
+                concurrency=concurrency, duration=duration
+            )
             await self.test_url_ranking(concurrency=concurrency, duration=duration)
             await self.test_rank_results(concurrency=concurrency, duration=duration)
             await self.test_ad_matching(concurrency=concurrency, duration=duration)
-            await self.test_service_recommendation(concurrency=concurrency, duration=duration)
+            await self.test_service_recommendation(
+                concurrency=concurrency, duration=duration
+            )
 
             # Advertising system tests
-            await self.test_campaign_management(concurrency=concurrency // 2, duration=duration)
-            await self.test_reporting_endpoints(concurrency=concurrency // 2, duration=duration)
+            await self.test_campaign_management(
+                concurrency=concurrency // 2, duration=duration
+            )
+            await self.test_reporting_endpoints(
+                concurrency=concurrency // 2, duration=duration
+            )
 
             # Memory leak test
             await self.test_memory_leaks(iterations=500)
 
             # Combined stress test
-            await self.test_concurrent_all_endpoints(concurrency=concurrency, duration=duration * 2)
+            await self.test_concurrent_all_endpoints(
+                concurrency=concurrency, duration=duration * 2
+            )
 
             # Generate report
             self.generate_report()
@@ -1081,18 +1215,33 @@ class ComprehensiveStressTestSuite:
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(description="Intent Engine Comprehensive Stress Test Suite")
-    parser.add_argument("--concurrency", type=int, default=50, help="Number of concurrent requests")
-    parser.add_argument("--duration", type=int, default=30, help="Duration of each test in seconds")
+    parser = argparse.ArgumentParser(
+        description="Intent Engine Comprehensive Stress Test Suite"
+    )
+    parser.add_argument(
+        "--concurrency", type=int, default=50, help="Number of concurrent requests"
+    )
+    parser.add_argument(
+        "--duration", type=int, default=30, help="Duration of each test in seconds"
+    )
     parser.add_argument("--url", type=str, default=BASE_URL, help="Base URL of the API")
-    parser.add_argument("--output", type=str, default="stress_test_report.json", help="Output file for report")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="stress_test_report.json",
+        help="Output file for report",
+    )
 
     args = parser.parse_args()
 
     suite = ComprehensiveStressTestSuite(base_url=args.url)
 
     try:
-        asyncio.run(suite.run_all_stress_tests(concurrency=args.concurrency, duration=args.duration))
+        asyncio.run(
+            suite.run_all_stress_tests(
+                concurrency=args.concurrency, duration=args.duration
+            )
+        )
     except KeyboardInterrupt:
         print("\n\n[WARN] Tests interrupted by user")
         suite.generate_report(args.output)

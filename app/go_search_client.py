@@ -57,7 +57,9 @@ class GoSearchClient:
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout))
+            self._session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout)
+            )
         return self._session
 
     async def close(self):
@@ -77,7 +79,9 @@ class GoSearchClient:
             logger.error(f"Health check failed: {e}")
             return {"status": "unhealthy", "error": str(e)}
 
-    async def search(self, query: str, limit: int = 10, filters: dict | None = None) -> GoSearchResponse | None:
+    async def search(
+        self, query: str, limit: int = 10, filters: dict | None = None
+    ) -> GoSearchResponse | None:
         """Search using Go crawler index."""
         if not self.enabled:
             return None
@@ -88,7 +92,9 @@ class GoSearchClient:
             if filters:
                 payload["filters"] = filters
 
-            async with session.post(f"{self.base_url}/api/v1/search", json=payload) as response:
+            async with session.post(
+                f"{self.base_url}/api/v1/search", json=payload
+            ) as response:
                 if response.status != 200:
                     logger.warning(f"Search failed with status {response.status}")
                     return None
@@ -138,7 +144,9 @@ class GoSearchClient:
             logger.error(f"Stats error: {e}")
             return None
 
-    async def add_seed_urls(self, urls: list[str], priority: int = 5, depth: int = 0) -> bool:
+    async def add_seed_urls(
+        self, urls: list[str], priority: int = 5, depth: int = 0
+    ) -> bool:
         """Add seed URLs to crawl queue."""
         if not self.enabled or not urls:
             return False
@@ -147,16 +155,25 @@ class GoSearchClient:
             session = await self._get_session()
 
             # Use "urls" as the primary field name, but include "seed_urls" for compatibility
-            payload = {"urls": urls, "seed_urls": urls, "priority": priority, "depth": depth}
+            payload = {
+                "urls": urls,
+                "seed_urls": urls,
+                "priority": priority,
+                "depth": depth,
+            }
 
             # Try /api/v1/crawl/seed first (standard), then fallback to /api/v1/add-urls
             endpoints = ["/api/v1/crawl/seed", "/api/v1/add-urls"]
 
             for endpoint in endpoints:
                 try:
-                    async with session.post(f"{self.base_url}{endpoint}", json=payload) as response:
+                    async with session.post(
+                        f"{self.base_url}{endpoint}", json=payload
+                    ) as response:
                         if response.status == 200:
-                            logger.info(f"Successfully added {len(urls)} URLs via {endpoint}")
+                            logger.info(
+                                f"Successfully added {len(urls)} URLs via {endpoint}"
+                            )
                             return True
                 except Exception as e:
                     logger.debug(f"Failed to add URLs via {endpoint}: {e}")

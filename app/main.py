@@ -66,7 +66,9 @@ def run_perf_tests():
     print("Running Performance Tests...\n")
 
     # Import and run each performance test
-    from app.perf_tests.perf_test_extractor import test_performance as test_extractor_perf
+    from app.perf_tests.perf_test_extractor import (
+        test_performance as test_extractor_perf,
+    )
 
     print("Testing Intent Extractor Performance:")
     test_extractor_perf()
@@ -93,7 +95,9 @@ def run_perf_tests():
 
 def cli_main():
     """Main CLI entry point"""
-    parser = argparse.ArgumentParser(description="Intent Engine - Privacy-First Intent Processing System")
+    parser = argparse.ArgumentParser(
+        description="Intent Engine - Privacy-First Intent Processing System"
+    )
     parser.add_argument(
         "command",
         nargs="?",
@@ -116,7 +120,9 @@ def cli_main():
     )
 
     # Arguments for specific commands
-    parser.add_argument("--query", "-q", type=str, help="Query text for intent processing")
+    parser.add_argument(
+        "--query", "-q", type=str, help="Query text for intent processing"
+    )
     parser.add_argument("--input-file", "-i", type=str, help="Input file with query")
     parser.add_argument("--output-file", "-o", type=str, help="Output file for results")
 
@@ -164,7 +170,9 @@ def cli_main():
                 with open(args.input_file) as f:
                     query = f.read().strip()
             else:
-                print("Error: Either --query or --input-file must be provided for 'extract' command")
+                print(
+                    "Error: Either --query or --input-file must be provided for 'extract' command"
+                )
                 sys.exit(1)
 
         # Create extraction request
@@ -180,7 +188,11 @@ def cli_main():
             "query": query,
             "intentId": response.intent.intentId,
             "declared": {
-                "goal": (response.intent.declared.goal.value if response.intent.declared.goal else None),
+                "goal": (
+                    response.intent.declared.goal.value
+                    if response.intent.declared.goal
+                    else None
+                ),
                 "constraints": [
                     {
                         "type": c.type.value,

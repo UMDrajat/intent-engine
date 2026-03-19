@@ -46,7 +46,9 @@ class PerformanceBenchmark:
             "stress_test": {},
         }
 
-    async def single_request_latency(self, session: aiohttp.ClientSession, query: str) -> dict[str, Any]:
+    async def single_request_latency(
+        self, session: aiohttp.ClientSession, query: str
+    ) -> dict[str, Any]:
         """Test single request latency"""
         payload = {
             "query": query,
@@ -62,13 +64,15 @@ class PerformanceBenchmark:
 
         try:
             async with session.post(
-                SEARCH_ENDPOINT, json=payload, timeout=aiohttp.ClientTimeout(total=TIMEOUT_SECONDS)
+                SEARCH_ENDPOINT,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=TIMEOUT_SECONDS),
             ) as response:
                 end_time = time.perf_counter()
                 response_time = (end_time - start_time) * 1000  # ms
 
                 data = await response.json()
-                
+
                 if response.status != 200:
                     print(f"\n  Error from API: {data}")
                     return {
@@ -78,7 +82,7 @@ class PerformanceBenchmark:
                         "results_count": 0,
                         "processing_time_ms": 0,
                         "success": False,
-                        "error_data": data
+                        "error_data": data,
                     }
 
                 return {
@@ -104,7 +108,9 @@ class PerformanceBenchmark:
         self, session: aiohttp.ClientSession, query: str, num_requests: int
     ) -> list[dict[str, Any]]:
         """Test concurrent requests"""
-        tasks = [self.single_request_latency(session, query) for _ in range(num_requests)]
+        tasks = [
+            self.single_request_latency(session, query) for _ in range(num_requests)
+        ]
         return await asyncio.gather(*tasks)
 
     async def run_benchmark(self):
@@ -146,7 +152,9 @@ class PerformanceBenchmark:
                     "max_ms": round(max(latencies), 2),
                     "mean_ms": round(statistics.mean(latencies), 2),
                     "median_ms": round(statistics.median(latencies), 2),
-                    "stdev_ms": round(statistics.stdev(latencies), 2) if len(latencies) > 1 else 0,
+                    "stdev_ms": round(statistics.stdev(latencies), 2)
+                    if len(latencies) > 1
+                    else 0,
                     "success_rate": "100%",
                 }
 
@@ -163,7 +171,10 @@ class PerformanceBenchmark:
                 start_time = time.perf_counter()
 
                 # Run concurrent requests
-                tasks = [self.single_request_latency(session, load_query) for _ in range(num_users * REQUESTS_PER_USER)]
+                tasks = [
+                    self.single_request_latency(session, load_query)
+                    for _ in range(num_users * REQUESTS_PER_USER)
+                ]
                 results = await asyncio.gather(*tasks)
 
                 end_time = time.perf_counter()
@@ -188,15 +199,22 @@ class PerformanceBenchmark:
                         "latency_mean_ms": round(statistics.mean(latencies), 2),
                         "latency_median_ms": round(statistics.median(latencies), 2),
                         "latency_p95_ms": round(
-                            sorted(latencies)[int(len(latencies) * 0.95)] if len(latencies) > 20 else max(latencies), 2
+                            sorted(latencies)[int(len(latencies) * 0.95)]
+                            if len(latencies) > 20
+                            else max(latencies),
+                            2,
                         ),
                     }
 
                     self.results["concurrent_load"].append(load_result)
 
-                    print(f"  ✓ Success: {successful}/{len(results)} ({load_result['success_rate']})")
+                    print(
+                        f"  ✓ Success: {successful}/{len(results)} ({load_result['success_rate']})"
+                    )
                     print(f"  ✓ Throughput: {load_result['requests_per_second']} req/s")
-                    print(f"  ✓ Latency: {load_result['latency_mean_ms']}ms avg, {load_result['latency_p95_ms']}ms p95")
+                    print(
+                        f"  ✓ Latency: {load_result['latency_mean_ms']}ms avg, {load_result['latency_p95_ms']}ms p95"
+                    )
                 else:
                     print("  ✗ All requests failed!")
                     self.results["concurrent_load"].append(
@@ -211,14 +229,22 @@ class PerformanceBenchmark:
             print("\nSending 50 requests as fast as possible...")
             start_time = time.perf_counter()
 
-            tasks = [self.single_request_latency(session, load_query) for _ in range(50)]
+            tasks = [
+                self.single_request_latency(session, load_query) for _ in range(50)
+            ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             end_time = time.perf_counter()
             total_time = end_time - start_time
 
-            successful = sum(1 for r in results if isinstance(r, dict) and r.get("success"))
-            latencies = [r["response_time_ms"] for r in results if isinstance(r, dict) and r["success"]]
+            successful = sum(
+                1 for r in results if isinstance(r, dict) and r.get("success")
+            )
+            latencies = [
+                r["response_time_ms"]
+                for r in results
+                if isinstance(r, dict) and r["success"]
+            ]
 
             self.results["stress_test"] = {
                 "total_requests": 50,
@@ -229,11 +255,17 @@ class PerformanceBenchmark:
                 "requests_per_second": round(50 / total_time, 2),
                 "latency_min_ms": round(min(latencies), 2) if latencies else 0,
                 "latency_max_ms": round(max(latencies), 2) if latencies else 0,
-                "latency_mean_ms": round(statistics.mean(latencies), 2) if latencies else 0,
+                "latency_mean_ms": round(statistics.mean(latencies), 2)
+                if latencies
+                else 0,
             }
 
-            print(f"  ✓ Success: {successful}/50 ({self.results['stress_test']['success_rate']})")
-            print(f"  ✓ Throughput: {self.results['stress_test']['requests_per_second']} req/s")
+            print(
+                f"  ✓ Success: {successful}/50 ({self.results['stress_test']['success_rate']})"
+            )
+            print(
+                f"  ✓ Throughput: {self.results['stress_test']['requests_per_second']} req/s"
+            )
             print(f"  ✓ Total time: {total_time:.2f}s")
 
         # Print summary
@@ -251,10 +283,14 @@ class PerformanceBenchmark:
         print("\n📊 SINGLE REQUEST LATENCY:")
         for query, stats in self.results["single_request"].items():
             print(f"\n  '{query[:50]}...'")
-            print(f"    Mean: {stats['mean_ms']}ms | Median: {stats['median_ms']}ms | P95: ~{stats['max_ms']}ms")
+            print(
+                f"    Mean: {stats['mean_ms']}ms | Median: {stats['median_ms']}ms | P95: ~{stats['max_ms']}ms"
+            )
 
         print("\n📈 CONCURRENT LOAD PERFORMANCE:")
-        print(f"  {'Users':<8} {'Req/s':<10} {'Mean Lat':<12} {'P95 Lat':<12} {'Success':<10}")
+        print(
+            f"  {'Users':<8} {'Req/s':<10} {'Mean Lat':<12} {'P95 Lat':<12} {'Success':<10}"
+        )
         print(f"  {'-' * 8} {'-' * 10} {'-' * 12} {'-' * 12} {'-' * 10}")
         for load in self.results["concurrent_load"]:
             if "error" not in load:

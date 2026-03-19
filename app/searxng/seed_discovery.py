@@ -29,7 +29,9 @@ class SeedURLDiscovery:
         self.searxng_url = searxng_url
         self._discovered_domains: set[str] = set()
 
-    async def discover_urls_for_topic(self, topic: str, max_urls: int = 20, min_score: float = 0.5) -> list[dict]:
+    async def discover_urls_for_topic(
+        self, topic: str, max_urls: int = 20, min_score: float = 0.5
+    ) -> list[dict]:
         """
         Discover seed URLs for a specific topic.
 
@@ -149,7 +151,9 @@ class SeedURLDiscovery:
         ]
         return any(pattern in domain for pattern in authoritative_patterns)
 
-    async def discover_multiple_topics(self, topics: list[str], urls_per_topic: int = 10) -> list[dict]:
+    async def discover_multiple_topics(
+        self, topics: list[str], urls_per_topic: int = 10
+    ) -> list[dict]:
         """
         Discover URLs for multiple topics in parallel.
 
@@ -163,7 +167,10 @@ class SeedURLDiscovery:
         logger.info(f"Discovering URLs for {len(topics)} topics")
 
         # Run discovery for all topics in parallel
-        tasks = [self.discover_urls_for_topic(topic, max_urls=urls_per_topic) for topic in topics]
+        tasks = [
+            self.discover_urls_for_topic(topic, max_urls=urls_per_topic)
+            for topic in topics
+        ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -186,7 +193,9 @@ class SeedURLDiscovery:
         logger.info(f"Total discovered URLs: {len(unique_urls)}")
         return unique_urls
 
-    async def add_to_crawler(self, urls: list[dict], crawler_api_url: str = None) -> bool:
+    async def add_to_crawler(
+        self, urls: list[dict], crawler_api_url: str = None
+    ) -> bool:
         """
         Add discovered URLs to the Go crawler queue.
 
@@ -199,9 +208,11 @@ class SeedURLDiscovery:
         """
         import os
         import aiohttp
-        
+
         # Use environment variable first (for aio container)
-        crawler_api_url = crawler_api_url or os.getenv("GO_SEARCH_API_URL", "http://127.0.0.1:8081")
+        crawler_api_url = crawler_api_url or os.getenv(
+            "GO_SEARCH_API_URL", "http://127.0.0.1:8081"
+        )
 
         if not urls:
             return False
@@ -227,10 +238,14 @@ class SeedURLDiscovery:
                 for endpoint in endpoints:
                     try:
                         async with session.post(
-                            f"{crawler_api_url}{endpoint}", json=payload, timeout=aiohttp.ClientTimeout(total=10)
+                            f"{crawler_api_url}{endpoint}",
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=10),
                         ) as response:
                             if response.status == 200:
-                                logger.info(f"Added {len(urls)} URLs to crawler via {endpoint}")
+                                logger.info(
+                                    f"Added {len(urls)} URLs to crawler via {endpoint}"
+                                )
                                 success = True
                                 break
                     except Exception as e:
@@ -304,20 +319,26 @@ async def run_seed_discovery():
     discovery = SeedURLDiscovery()
 
     # Discover URLs for Go language topics
-    go_urls = await discovery.discover_multiple_topics(topics=DISCOVERY_TOPICS["go_language"], urls_per_topic=10)
+    go_urls = await discovery.discover_multiple_topics(
+        topics=DISCOVERY_TOPICS["go_language"], urls_per_topic=10
+    )
 
     if go_urls:
         logger.info(f"Discovered {len(go_urls)} Go-related URLs")
         await discovery.add_to_crawler(go_urls)
 
     # Discover URLs for general programming
-    prog_urls = await discovery.discover_multiple_topics(topics=DISCOVERY_TOPICS["programming"], urls_per_topic=5)
+    prog_urls = await discovery.discover_multiple_topics(
+        topics=DISCOVERY_TOPICS["programming"], urls_per_topic=5
+    )
 
     if prog_urls:
         logger.info(f"Discovered {len(prog_urls)} programming URLs")
         await discovery.add_to_crawler(prog_urls)
 
-    logger.info(f"Discovery complete. Total domains: {len(discovery.get_discovered_domains())}")
+    logger.info(
+        f"Discovery complete. Total domains: {len(discovery.get_discovered_domains())}"
+    )
 
     return {
         "go_urls": len(go_urls),

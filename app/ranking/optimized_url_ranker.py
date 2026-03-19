@@ -406,7 +406,11 @@ class URLRanker:
 
         # Extract negative preferences from intent
         negative_preferences = None
-        if request.intent and request.intent.declared and request.intent.declared.negativePreferences:
+        if (
+            request.intent
+            and request.intent.declared
+            and request.intent.declared.negativePreferences
+        ):
             negative_preferences = request.intent.declared.negativePreferences
 
         # Analyze all URLs in parallel
@@ -447,7 +451,10 @@ class URLRanker:
         """Analyze multiple URLs in parallel"""
         # Create tasks for parallel execution
         tasks = [
-            asyncio.get_running_loop().run_in_executor(self.executor, self.analyzer.analyze_url, url) for url in urls
+            asyncio.get_running_loop().run_in_executor(
+                self.executor, self.analyzer.analyze_url, url
+            )
+            for url in urls
         ]
 
         # Wait for all tasks
@@ -477,7 +484,10 @@ class URLRanker:
 
         for result in results:
             # Check minimum privacy score (handle None case)
-            if result.privacy_score is not None and result.privacy_score < min_privacy_score:
+            if (
+                result.privacy_score is not None
+                and result.privacy_score < min_privacy_score
+            ):
                 continue
 
             # Check Big Tech exclusion
@@ -494,7 +504,9 @@ class URLRanker:
 
         return filtered
 
-    def _satisfies_negative_preferences(self, url_result: URLResult, preferences: list[str]) -> bool:
+    def _satisfies_negative_preferences(
+        self, url_result: URLResult, preferences: list[str]
+    ) -> bool:
         """Check if URL satisfies negative preferences like 'no google'"""
         for pref in preferences:
             pref_lower = pref.lower().replace("no ", "").replace("not ", "")
@@ -503,12 +515,16 @@ class URLRanker:
             privacy_db = PrivacyDatabase()
             for big_tech in privacy_db.BIG_TECH_DOMAINS:
                 if big_tech.replace(".com", "").replace(".", " ") in pref_lower:
-                    if big_tech in url_result.domain or url_result.domain.endswith("." + big_tech):
+                    if big_tech in url_result.domain or url_result.domain.endswith(
+                        "." + big_tech
+                    ):
                         return False
 
         return True
 
-    async def _calculate_relevance_scores(self, results: list[URLResult], query: str) -> None:
+    async def _calculate_relevance_scores(
+        self, results: list[URLResult], query: str
+    ) -> None:
         """Calculate semantic relevance scores for all URLs"""
         if not results or not query:
             return
@@ -522,15 +538,21 @@ class URLRanker:
             return
 
         # Prepare content texts
-        contents = [f"{result.title} {result.description} {result.domain}" for result in results]
+        contents = [
+            f"{result.title} {result.description} {result.domain}" for result in results
+        ]
 
         # Get embeddings in batch
         content_embs = self.embedding_cache.encode_batch(contents)
 
         # Calculate similarities
-        for _i, (result, content_emb) in enumerate(zip(results, content_embs, strict=False)):
+        for _i, (result, content_emb) in enumerate(
+            zip(results, content_embs, strict=False)
+        ):
             if content_emb is not None:
-                similarity = self.embedding_cache.cosine_similarity(query_emb, content_emb)
+                similarity = self.embedding_cache.cosine_similarity(
+                    query_emb, content_emb
+                )
                 result.relevance_score = (similarity + 1) / 2  # Normalize to 0-1
             else:
                 result.relevance_score = self._keyword_relevance(query, result)
@@ -569,7 +591,9 @@ class URLRanker:
             # Calculate weighted average
             total_weight = sum(weights.values())
             result.final_score = (
-                sum(scores[key] * weights.get(key, 0) for key in scores) / total_weight if total_weight > 0 else 0
+                sum(scores[key] * weights.get(key, 0) for key in scores) / total_weight
+                if total_weight > 0
+                else 0
             )
 
     def _calculate_ethics_score(self, result: URLResult) -> float:

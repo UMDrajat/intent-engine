@@ -47,9 +47,16 @@ def seed_data():
         # Create advertisers
         advertisers = [
             Advertiser(name="TechGadgets Inc.", contact_email="ads@techgadgets.com"),
-            Advertiser(name="Privacy Solutions Ltd.", contact_email="marketing@privacysolutions.io"),
-            Advertiser(name="EcoFriendly Products", contact_email="hello@ecofriendly.shop"),
-            Advertiser(name="OpenSource Tools", contact_email="community@opensource.tools"),
+            Advertiser(
+                name="Privacy Solutions Ltd.",
+                contact_email="marketing@privacysolutions.io",
+            ),
+            Advertiser(
+                name="EcoFriendly Products", contact_email="hello@ecofriendly.shop"
+            ),
+            Advertiser(
+                name="OpenSource Tools", contact_email="community@opensource.tools"
+            ),
         ]
 
         for adv in advertisers:
@@ -128,13 +135,20 @@ def seed_data():
             AdGroup(
                 campaign_id=campaigns[0].id,
                 name="Budget Laptops",
-                targeting_settings={"device_type": ["laptop"], "price_range": ["budget"], "location": ["US", "IN"]},
+                targeting_settings={
+                    "device_type": ["laptop"],
+                    "price_range": ["budget"],
+                    "location": ["US", "IN"],
+                },
                 bid_strategy="manual",
             ),
             AdGroup(
                 campaign_id=campaigns[1].id,
                 name="Privacy Conscious Users",
-                targeting_settings={"interests": ["privacy", "security", "vpn"], "location": ["US", "UK", "DE", "FR"]},
+                targeting_settings={
+                    "interests": ["privacy", "security", "vpn"],
+                    "location": ["US", "UK", "DE", "FR"],
+                },
                 bid_strategy="automatic",
             ),
             AdGroup(
@@ -175,7 +189,10 @@ def seed_data():
                 title="Best Programming Laptops 2026",
                 description="High-performance laptops for developers. Starting at ₹45,999",
                 url="https://techgadgets.com/laptops/programming",
-                targeting_constraints={"category": "electronics", "use_case": "programming"},
+                targeting_constraints={
+                    "category": "electronics",
+                    "use_case": "programming",
+                },
                 ethical_tags=["quality", "performance"],
                 quality_score=0.85,
                 creative_format="native",
@@ -189,7 +206,10 @@ def seed_data():
                 title="Budget Laptops Under ₹30,000",
                 description="Affordable laptops perfect for students and everyday use",
                 url="https://techgadgets.com/laptops/budget",
-                targeting_constraints={"category": "electronics", "price_range": "budget"},
+                targeting_constraints={
+                    "category": "electronics",
+                    "price_range": "budget",
+                },
                 ethical_tags=["affordable", "value"],
                 quality_score=0.78,
                 creative_format="banner",

@@ -75,7 +75,9 @@ class ResultAggregator:
                             Higher = more aggressive deduplication
         """
         self.dedup_threshold = dedup_threshold
-        logger.info(f"ResultAggregator initialized with dedup_threshold={dedup_threshold}")
+        logger.info(
+            f"ResultAggregator initialized with dedup_threshold={dedup_threshold}"
+        )
 
     def aggregate(self, results: list[SearchResult]) -> list[AggregatedResult]:
         """
@@ -170,7 +172,11 @@ class ResultAggregator:
                 "pk_kwd",
             }
 
-            filtered_params = {k: v for k, v in query_params.items() if k.lower() not in tracking_params}
+            filtered_params = {
+                k: v
+                for k, v in query_params.items()
+                if k.lower() not in tracking_params
+            }
 
             # Rebuild URL
             normalized = parsed._replace(query=urlencode(filtered_params, doseq=True))
@@ -180,7 +186,9 @@ class ResultAggregator:
 
             # Ensure consistent trailing slash
             path = normalized.path
-            if not path.endswith("/") and not path.endswith((".html", ".htm", ".php", ".asp", ".aspx")):
+            if not path.endswith("/") and not path.endswith(
+                (".html", ".htm", ".php", ".asp", ".aspx")
+            ):
                 path = path + "/"
                 normalized = normalized._replace(path=path)
 
@@ -202,7 +210,9 @@ class ResultAggregator:
         """Generate consistent hash for URL"""
         return hashlib.md5(url.encode()).hexdigest()
 
-    def _merge_results(self, url_key: str, results: list[SearchResult]) -> AggregatedResult:
+    def _merge_results(
+        self, url_key: str, results: list[SearchResult]
+    ) -> AggregatedResult:
         """
         Merge multiple results for the same URL.
 
@@ -317,7 +327,9 @@ class ResultAggregator:
                 similarity = self._jaccard_similarity(content_words, seen_set)
                 if similarity >= similarity_threshold:
                     is_duplicate = True
-                    logger.debug(f"Filtered duplicate result (similarity={similarity:.2f}): {result.url}")
+                    logger.debug(
+                        f"Filtered duplicate result (similarity={similarity:.2f}): {result.url}"
+                    )
                     break
 
             if not is_duplicate:
@@ -341,7 +353,9 @@ class ResultAggregator:
 
         return intersection / union if union > 0 else 0.0
 
-    def normalize_scores(self, results: list[AggregatedResult], method: str = "minmax") -> list[AggregatedResult]:
+    def normalize_scores(
+        self, results: list[AggregatedResult], method: str = "minmax"
+    ) -> list[AggregatedResult]:
         """
         Normalize scores across results.
 
@@ -363,7 +377,9 @@ class ResultAggregator:
             # Scale to 0-1 range
             for result in results:
                 if max_score - min_score > 0:
-                    result.best_score = (result.best_score - min_score) / (max_score - min_score)
+                    result.best_score = (result.best_score - min_score) / (
+                        max_score - min_score
+                    )
                 else:
                     result.best_score = 1.0 if result.best_score > 0 else 0.0
 
@@ -375,7 +391,9 @@ class ResultAggregator:
             stdev = statistics.stdev(scores) if len(scores) > 1 else 1.0
 
             for result in results:
-                result.best_score = (result.best_score - mean) / stdev if stdev > 0 else 0.0
+                result.best_score = (
+                    (result.best_score - mean) / stdev if stdev > 0 else 0.0
+                )
                 # Clamp to 0-1
                 result.best_score = max(0.0, min(1.0, result.best_score))
 
@@ -389,7 +407,9 @@ class ResultAggregator:
                 x = result.best_score - mean
                 result.best_score = 1 / (1 + math.exp(-x))
 
-        logger.debug(f"Score normalization ({method}): min={min(scores):.3f}, max={max(scores):.3f}")
+        logger.debug(
+            f"Score normalization ({method}): min={min(scores):.3f}, max={max(scores):.3f}"
+        )
         return results
 
 

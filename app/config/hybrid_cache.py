@@ -60,7 +60,9 @@ class HybridEmbeddingCache:
         """
         self.model_name = model_name
         self.redis_ttl = redis_ttl
-        self.use_redis = use_redis and os.getenv("REDIS_ENABLED", "false").lower() == "true"
+        self.use_redis = (
+            use_redis and os.getenv("REDIS_ENABLED", "false").lower() == "true"
+        )
 
         # L1: Local cache
         self.local_cache = LRUCache(capacity=local_capacity)
@@ -102,12 +104,18 @@ class HybridEmbeddingCache:
             self.model = self.model.to("cpu")
             self.model.eval()
 
-            logger.info(f"Successfully loaded SentenceTransformer model: {self.model_name}")
+            logger.info(
+                f"Successfully loaded SentenceTransformer model: {self.model_name}"
+            )
         except ImportError as e:
-            logger.warning(f"SentenceTransformers library not available: {e}. Using mock embeddings.")
+            logger.warning(
+                f"SentenceTransformers library not available: {e}. Using mock embeddings."
+            )
             self.model = None
         except Exception as e:
-            logger.error(f"Error loading embedding model {self.model_name}: {e}. Using mock embeddings.")
+            logger.error(
+                f"Error loading embedding model {self.model_name}: {e}. Using mock embeddings."
+            )
             self.model = None
 
     def _get_cache_key(self, text: str) -> str:
@@ -166,7 +174,9 @@ class HybridEmbeddingCache:
 
         return embedding
 
-    def encode_batch(self, texts: list[str], use_cache: bool = True) -> list[np.ndarray]:
+    def encode_batch(
+        self, texts: list[str], use_cache: bool = True
+    ) -> list[np.ndarray]:
         """
         Encode multiple texts with two-tier caching.
 

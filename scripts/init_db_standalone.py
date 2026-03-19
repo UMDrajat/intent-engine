@@ -22,7 +22,8 @@ if not DATABASE_URL:
 else:
     # Extract user from URL if possible for GRANT command
     import re
-    match = re.search(r'://([^:]+):', DATABASE_URL)
+
+    match = re.search(r"://([^:]+):", DATABASE_URL)
     user = match.group(1) if match else os.getenv("POSTGRES_USER", "intent_user")
 
 from sqlalchemy import text
@@ -64,7 +65,11 @@ tables_created = sorted(inspector.get_table_names())
 print(f"   Tables created: {', '.join(tables_created)}")
 
 # Verify key tables exist
-if "creative_assets" in tables_created and "audit_trails" in tables_created and "user_consents" in tables_created:
+if (
+    "creative_assets" in tables_created
+    and "audit_trails" in tables_created
+    and "user_consents" in tables_created
+):
     print("✅ Database initialized successfully!")
 else:
     print(

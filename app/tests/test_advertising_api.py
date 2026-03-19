@@ -85,7 +85,10 @@ def test_adgroup_endpoints():
         adgroup_data = {
             "campaign_id": campaign_id,
             "name": "Test Ad Group",
-            "targeting_settings": {"device_type": ["mobile", "desktop"], "location": ["US", "CA"]},
+            "targeting_settings": {
+                "device_type": ["mobile", "desktop"],
+                "location": ["US", "CA"],
+            },
             "bid_strategy": "manual",
         }
 
@@ -119,7 +122,10 @@ def test_creative_endpoints():
     try:
         # First, create an ad to associate with the creative
         # Create an advertiser first
-        advertiser_data = {"name": "Test Advertiser for Creative", "contact_email": "creative@example.com"}
+        advertiser_data = {
+            "name": "Test Advertiser for Creative",
+            "contact_email": "creative@example.com",
+        }
 
         response = requests.post(f"{BASE_URL}/advertisers", json=advertiser_data)
         if response.status_code != 200:
@@ -154,7 +160,10 @@ def test_creative_endpoints():
         adgroup_data = {
             "campaign_id": campaign_id,
             "name": "Test Ad Group for Creative",
-            "targeting_settings": {"device_type": ["mobile", "desktop"], "location": ["US", "CA"]},
+            "targeting_settings": {
+                "device_type": ["mobile", "desktop"],
+                "location": ["US", "CA"],
+            },
             "bid_strategy": "manual",
         }
 
@@ -204,7 +213,9 @@ def test_creative_endpoints():
         response = requests.post(f"{BASE_URL}/creatives", json=creative_data)
         if response.status_code == 200:
             creative = response.json()
-            print(f"[OK] Created creative: {creative['asset_type']} (ID: {creative['id']})")
+            print(
+                f"[OK] Created creative: {creative['asset_type']} (ID: {creative['id']})"
+            )
             creative_id = creative["id"]
         else:
             print(f"[ERROR] Failed to create creative: {response.text}")
@@ -235,7 +246,9 @@ def test_reporting_endpoints():
             reports = response.json()
             print(f"[OK] Retrieved {len(reports)} campaign performance reports")
         else:
-            print(f"[ERROR] Failed to retrieve campaign performance reports: {response.text}")
+            print(
+                f"[ERROR] Failed to retrieve campaign performance reports: {response.text}"
+            )
             return False
 
         return True
@@ -273,7 +286,9 @@ def test_advanced_ad_matching():
         response = requests.post(f"{BASE_URL}/match-ads-advanced", json=request_data)
         if response.status_code == 200:
             result = response.json()
-            print(f"[OK] Advanced ad matching returned {len(result['matched_ads'])} ads")
+            print(
+                f"[OK] Advanced ad matching returned {len(result['matched_ads'])} ads"
+            )
         else:
             print(f"[ERROR] Failed advanced ad matching: {response.text}")
             return False

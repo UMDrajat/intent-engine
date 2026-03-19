@@ -27,7 +27,9 @@ class TestURLRankingAPI(unittest.TestCase):
         cls.transport = httpx.ASGITransport(app=app)
 
     async def _post(self, url, json):
-        async with httpx.AsyncClient(transport=self.transport, base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=self.transport, base_url="http://test"
+        ) as client:
             return await client.post(url, json=json)
 
     def post(self, url, json):
@@ -149,7 +151,14 @@ class TestURLRankingAPI(unittest.TestCase):
                 "https://protonmail.com",
                 "https://google.com",
             ],
-            "options": {"weights": {"relevance": 0.1, "privacy": 0.6, "quality": 0.15, "ethics": 0.15}},
+            "options": {
+                "weights": {
+                    "relevance": 0.1,
+                    "privacy": 0.6,
+                    "quality": 0.15,
+                    "ethics": 0.15,
+                }
+            },
         }
 
         response = self.post("/rank-urls", payload)
@@ -171,7 +180,11 @@ class TestURLRankingAPI(unittest.TestCase):
                 "intentId": "test-api-1",
                 "context": {"product": "search"},
                 "declared": {"query": "open source code hosting"},
-                "inferred": {"ethicalSignals": [{"dimension": "openness", "preference": "open-source_preferred"}]},
+                "inferred": {
+                    "ethicalSignals": [
+                        {"dimension": "openness", "preference": "open-source_preferred"}
+                    ]
+                },
             },
         }
 
@@ -198,7 +211,10 @@ class TestURLRankingAPI(unittest.TestCase):
             "intent": {
                 "intentId": "test-api-2",
                 "context": {"product": "search"},
-                "declared": {"query": "search engine", "negativePreferences": ["no google", "no facebook"]},
+                "declared": {
+                    "query": "search engine",
+                    "negativePreferences": ["no google", "no facebook"],
+                },
                 "inferred": {},
             },
         }

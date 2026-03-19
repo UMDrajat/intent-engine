@@ -8,7 +8,15 @@ import sys
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
-from app.database import Ad, AdGroup, AdMetric, Advertiser, Campaign, CreativeAsset, SessionLocal
+from app.database import (
+    Ad,
+    AdGroup,
+    AdMetric,
+    Advertiser,
+    Campaign,
+    CreativeAsset,
+    SessionLocal,
+)
 
 db = SessionLocal()
 try:

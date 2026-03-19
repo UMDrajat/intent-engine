@@ -103,7 +103,9 @@ class UnifiedQueryRouter:
         self._searxng_client = None
 
         # Backend-specific configurations
-        self.searxng_categories = self.config.get("searxng_categories", ["general", "news", "science", "tech"])
+        self.searxng_categories = self.config.get(
+            "searxng_categories", ["general", "news", "science", "tech"]
+        )
 
         logger.info("UnifiedQueryRouter initialized")
 
@@ -134,7 +136,11 @@ class UnifiedQueryRouter:
         ethical_signals = intent.inferred.ethicalSignals if intent.inferred else []
 
         # Rule 1: Troubleshooting & Programming Errors → SearXNG (community discussions) + Go Crawler
-        if goal in [IntentGoal.TROUBLESHOOTING, IntentGoal.PROGRAMMING_ERROR, IntentGoal.CODE_DEBUG]:
+        if goal in [
+            IntentGoal.TROUBLESHOOTING,
+            IntentGoal.PROGRAMMING_ERROR,
+            IntentGoal.CODE_DEBUG,
+        ]:
             logger.debug(f"Routing {goal.value} query to hybrid backends")
             return QueryRoute(
                 backends=[SearchBackend.SEARXNG, SearchBackend.GO_CRAWLER],
@@ -189,18 +195,24 @@ class UnifiedQueryRouter:
 
         # Rule 5: Privacy-focused queries → prefer Go crawler (curated)
         # BUT: Still query SearXNG as backup since Go Crawler may not have content
-        privacy_signals = [s for s in ethical_signals if s.dimension == EthicalDimension.PRIVACY]
+        privacy_signals = [
+            s for s in ethical_signals if s.dimension == EthicalDimension.PRIVACY
+        ]
         if privacy_signals:
-            logger.debug("Routing privacy-focused query to Go Crawler + SearXNG (fallback)")
+            logger.debug(
+                "Routing privacy-focused query to Go Crawler + SearXNG (fallback)"
+            )
             return QueryRoute(
                 backends=[SearchBackend.GO_CRAWLER, SearchBackend.SEARXNG],
                 weights={
                     SearchBackend.GO_CRAWLER: 0.6,  # Prefer Go Crawler
-                    SearchBackend.SEARXNG: 0.4,     # But also query SearXNG
+                    SearchBackend.SEARXNG: 0.4,  # But also query SearXNG
                 },
                 parallel=True,  # Query both in parallel
                 timeout_ms=4000,
-                fallback_chain=[SearchBackend.SEARXNG],  # If Go Crawler fails, use SearXNG
+                fallback_chain=[
+                    SearchBackend.SEARXNG
+                ],  # If Go Crawler fails, use SearXNG
                 max_results_per_backend=self.default_max_results,
             )
 
@@ -260,11 +272,15 @@ class UnifiedQueryRouter:
             task = self._search_backend(backend, query, max_results)
             tasks.append((backend, task))
 
-        logger.info(f"Executing search across {len(tasks)} backends: {[b.value for b, _ in tasks]}")
+        logger.info(
+            f"Executing search across {len(tasks)} backends: {[b.value for b, _ in tasks]}"
+        )
 
         # Execute in parallel or sequentially
         if route.parallel:
-            backend_results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
+            backend_results = await asyncio.gather(
+                *[task for _, task in tasks], return_exceptions=True
+            )
 
             # Pair backends with results
             for (backend, _), result in zip(tasks, backend_results, strict=False):
@@ -276,13 +292,19 @@ class UnifiedQueryRouter:
             # Sequential execution with fallback
             for backend, task in tasks:
                 try:
-                    result = await asyncio.wait_for(task, timeout=route.timeout_ms / 1000)
+                    result = await asyncio.wait_for(
+                        task, timeout=route.timeout_ms / 1000
+                    )
                     if result:
                         results.extend(result)
-                        logger.debug(f"Backend {backend.value} returned {len(result)} results")
+                        logger.debug(
+                            f"Backend {backend.value} returned {len(result)} results"
+                        )
                         break  # Found results, stop fallback
                     else:
-                        logger.debug(f"Backend {backend.value} returned no results, trying fallback")
+                        logger.debug(
+                            f"Backend {backend.value} returned no results, trying fallback"
+                        )
                 except TimeoutError:
                     logger.warning(f"Backend {backend.value} timed out")
                     continue
@@ -293,7 +315,9 @@ class UnifiedQueryRouter:
         logger.info(f"Search completed: {len(results)} total results")
         return results
 
-    async def _search_backend(self, backend: SearchBackend, query: str, max_results: int) -> list[SearchResult]:
+    async def _search_backend(
+        self, backend: SearchBackend, query: str, max_results: int
+    ) -> list[SearchResult]:
         """Search a specific backend"""
         if backend == SearchBackend.GO_CRAWLER:
             return await self._search_go_crawler(query, max_results)
@@ -304,14 +328,18 @@ class UnifiedQueryRouter:
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
-    async def _search_go_crawler(self, query: str, max_results: int) -> list[SearchResult]:
+    async def _search_go_crawler(
+        self, query: str, max_results: int
+    ) -> list[SearchResult]:
         """Search Go crawler index"""
         from app.go_search_client import GoSearchClient
 
         try:
             # Initialize client lazily if not already done
             if not self._go_client:
-                self._go_client = GoSearchClient(base_url=self._get_go_crawler_url(), timeout=5.0)
+                self._go_client = GoSearchClient(
+                    base_url=self._get_go_crawler_url(), timeout=5.0
+                )
 
             # Optimization: Skip redundant health check for every search
             # We rely on the search call itself failing if unhealthy (fast failure)
@@ -405,7 +433,9 @@ class UnifiedQueryRouter:
             logger.error(f"SearXNG search failed: {e}")
             return []
 
-    async def _search_custom_index(self, query: str, max_results: int) -> list[SearchResult]:
+    async def _search_custom_index(
+        self, query: str, max_results: int
+    ) -> list[SearchResult]:
         """Search custom intent-indexed content (Qdrant)"""
         try:
             from app.core.vector_store import get_vector_store
@@ -423,7 +453,9 @@ class UnifiedQueryRouter:
                 return []
 
             # Search vector store
-            results = vector_store.search_similar(query_embedding=embedding.tolist(), limit=max_results)
+            results = vector_store.search_similar(
+                query_embedding=embedding.tolist(), limit=max_results
+            )
 
             # Convert to SearchResult
             search_results = [
@@ -452,6 +484,7 @@ class UnifiedQueryRouter:
     def _get_go_crawler_url(self) -> str:
         """Get Go crawler URL from config or environment"""
         import os
+
         # Use environment variable first (for aio container), then config
         env_url = os.getenv("GO_CRAWLER_URL")
         if env_url:
@@ -461,6 +494,7 @@ class UnifiedQueryRouter:
     def _get_searxng_url(self) -> str:
         """Get SearXNG URL from config or environment"""
         import os
+
         # Use environment variable first (for aio container), then config
         env_url = os.getenv("SEARXNG_URL")
         if env_url:

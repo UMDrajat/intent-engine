@@ -77,7 +77,9 @@ if "postgresql" in DATABASE_URL:
             pool_pre_ping=True,
             echo=False,
         )
-        logger.info(f"PostgreSQL engine initialized with pool_size={POOL_SIZE}, max_overflow={POOL_MAX_OVERFLOW}")
+        logger.info(
+            f"PostgreSQL engine initialized with pool_size={POOL_SIZE}, max_overflow={POOL_MAX_OVERFLOW}"
+        )
 elif "sqlite" in DATABASE_URL:
     # SQLite configuration (for local development only)
     engine = create_engine(
@@ -122,7 +124,9 @@ class Campaign(Base):
     __tablename__ = "campaigns"
 
     id = Column(Integer, primary_key=True, index=True)
-    advertiser_id = Column(Integer, ForeignKey("advertisers.id"), nullable=False, index=True)
+    advertiser_id = Column(
+        Integer, ForeignKey("advertisers.id"), nullable=False, index=True
+    )
     name = Column(String, nullable=False, index=True)
     start_date = Column(DateTime(timezone=True), index=True)
     end_date = Column(DateTime(timezone=True), index=True)
@@ -148,10 +152,14 @@ class AdGroup(Base):
     Ad Groups table
     """
 
-    __tablename__ = "ad_groups"  # Using "ad_groups" to avoid conflicts with SQL reserved word
+    __tablename__ = (
+        "ad_groups"  # Using "ad_groups" to avoid conflicts with SQL reserved word
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False, index=True)
+    campaign_id = Column(
+        Integer, ForeignKey("campaigns.id"), nullable=False, index=True
+    )
     name = Column(String, nullable=False, index=True)
     targeting_settings = Column(JSON)  # JSON for targeting criteria
     bid_strategy = Column(String, default="manual")  # manual or automated bidding
@@ -163,7 +171,9 @@ class AdGroup(Base):
     ads = relationship("Ad", back_populates="ad_group")
 
     # Composite indexes for common queries
-    __table_args__ = (Index("ix_ad_groups_campaign_id_bid_strategy", "campaign_id", "bid_strategy"),)
+    __table_args__ = (
+        Index("ix_ad_groups_campaign_id_bid_strategy", "campaign_id", "bid_strategy"),
+    )
 
 
 class Ad(Base):
@@ -174,18 +184,28 @@ class Ad(Base):
     __tablename__ = "ads"
 
     id = Column(Integer, primary_key=True, index=True)
-    advertiser_id = Column(Integer, ForeignKey("advertisers.id"), nullable=False, index=True)
-    ad_group_id = Column(Integer, ForeignKey("ad_groups.id"), index=True)  # NEW: Link to ad group
+    advertiser_id = Column(
+        Integer, ForeignKey("advertisers.id"), nullable=False, index=True
+    )
+    ad_group_id = Column(
+        Integer, ForeignKey("ad_groups.id"), index=True
+    )  # NEW: Link to ad group
     title = Column(String, nullable=False)
     description = Column(Text)
     url = Column(String, nullable=False)
-    targeting_constraints = Column(JSON)  # e.g., [{"dimension": "device_type", "value": "mobile"}]
+    targeting_constraints = Column(
+        JSON
+    )  # e.g., [{"dimension": "device_type", "value": "mobile"}]
     ethical_tags = Column(JSON)  # e.g., ["privacy", "open_source"]
     quality_score = Column(Float, default=0.5)
     creative_format = Column(String)  # NEW: Banner, native, video, etc.
     bid_amount = Column(Float, default=0.0)  # NEW: Current bid amount
-    status = Column(String, default="active", index=True)  # NEW: active, paused, disapproved
-    approval_status = Column(String, default="pending")  # Index created via composite in __table_args__
+    status = Column(
+        String, default="active", index=True
+    )  # NEW: active, paused, disapproved
+    approval_status = Column(
+        String, default="pending"
+    )  # Index created via composite in __table_args__
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Relationship to advertiser
@@ -223,7 +243,9 @@ class CreativeAsset(Base):
     ad = relationship("Ad", back_populates="creative_assets")
 
     # Composite indexes for common queries
-    __table_args__ = (Index("ix_creative_assets_ad_id_asset_type", "ad_id", "asset_type"),)
+    __table_args__ = (
+        Index("ix_creative_assets_ad_id_asset_type", "ad_id", "asset_type"),
+    )
 
 
 class AdMetric(Base):
@@ -249,7 +271,9 @@ class AdMetric(Base):
     spend = Column(Float, default=0.0)
     revenue = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)  # 30 days from creation
+    expires_at = Column(
+        DateTime(timezone=True), nullable=False, index=True
+    )  # 30 days from creation
 
     # Relationship to ad
     ad = relationship("Ad", back_populates="metrics")
@@ -271,7 +295,9 @@ class ClickTracking(Base):
     id = Column(Integer, primary_key=True, index=True)
     ad_id = Column(Integer, ForeignKey("ads.id"), nullable=False, index=True)
     session_id = Column(String, index=True)  # Anonymous session identifier
-    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)  # Click timestamp
+    timestamp = Column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )  # Click timestamp
     ip_hash = Column(String, index=True)  # Hashed IP for fraud detection
     user_agent_hash = Column(String)  # Hashed user agent
     referring_url = Column(String)  # Source of click
@@ -300,8 +326,12 @@ class ConversionTracking(Base):
     )  # Foreign key to click tracking
     conversion_type = Column(String, index=True)  # Purchase, signup, download, etc.
     value = Column(Float)  # Conversion value (if applicable)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)  # Conversion timestamp
-    status = Column(String, default="pending", index=True)  # Verified, pending, rejected
+    timestamp = Column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )  # Conversion timestamp
+    status = Column(
+        String, default="pending", index=True
+    )  # Verified, pending, rejected
     payload = Column(JSON)
 
     # Relationship to click
@@ -326,9 +356,13 @@ class FraudDetection(Base):
     event_type = Column(String, index=True)  # Click, impression, conversion
     reason = Column(String)  # Reason for flagging
     severity = Column(String, index=True)  # Low, medium, high risk
-    review_status = Column(String, default="pending", index=True)  # Pending, reviewed, action_taken
+    review_status = Column(
+        String, default="pending", index=True
+    )  # Pending, reviewed, action_taken
     payload = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)  # Timestamp
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )  # Timestamp
 
     # Relationship to ad (optional, could be linked to ad_id if needed)
     ad_id = Column(Integer, ForeignKey("ads.id"), nullable=True, index=True)
@@ -337,7 +371,9 @@ class FraudDetection(Base):
     # Composite indexes for common queries
     __table_args__ = (
         Index("ix_fraud_detection_event_type_severity", "event_type", "severity"),
-        Index("ix_fraud_detection_review_status_created", "review_status", "created_at"),
+        Index(
+            "ix_fraud_detection_review_status_created", "review_status", "created_at"
+        ),
     )
 
 
@@ -358,17 +394,30 @@ class ABTest(Base):
     )  # draft, running, paused, completed, cancelled
     start_date = Column(DateTime(timezone=True), index=True)
     end_date = Column(DateTime(timezone=True), index=True)
-    traffic_allocation = Column(Float, default=1.0)  # Percentage of traffic to include in test
-    min_sample_size = Column(Integer, default=1000)  # Minimum samples before significance
+    traffic_allocation = Column(
+        Float, default=1.0
+    )  # Percentage of traffic to include in test
+    min_sample_size = Column(
+        Integer, default=1000
+    )  # Minimum samples before significance
     confidence_level = Column(Float, default=0.95)  # Statistical confidence level
     primary_metric = Column(String, default="ctr")  # Primary metric to optimize
-    winner_variant_id = Column(Integer, nullable=True)  # ID of winning variant (if determined)
+    winner_variant_id = Column(
+        Integer, nullable=True
+    )  # ID of winning variant (if determined)
     payload = Column(JSON)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), index=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        index=True,
+    )
 
     # Relationships
-    variants = relationship("ABTestVariant", back_populates="test", cascade="all, delete-orphan")
+    variants = relationship(
+        "ABTestVariant", back_populates="test", cascade="all, delete-orphan"
+    )
 
     # Composite indexes for common queries
     __table_args__ = (
@@ -387,9 +436,13 @@ class ABTestVariant(Base):
     id = Column(Integer, primary_key=True, index=True)
     test_id = Column(Integer, ForeignKey("ab_tests.id"), nullable=False, index=True)
     name = Column(String, nullable=False, index=True)  # e.g., "Control", "Variant A"
-    ad_id = Column(Integer, ForeignKey("ads.id"), index=True)  # The ad to show for this variant
+    ad_id = Column(
+        Integer, ForeignKey("ads.id"), index=True
+    )  # The ad to show for this variant
     traffic_weight = Column(Float, default=0.5)  # Weight for traffic splitting
-    is_control = Column(Boolean, default=False)  # Index created via composite in __table_args__
+    is_control = Column(
+        Boolean, default=False
+    )  # Index created via composite in __table_args__
     impressions = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
     conversions = Column(Integer, default=0)
@@ -419,7 +472,9 @@ class ABTestAssignment(Base):
     variant_id = Column(
         Integer, ForeignKey("ab_test_variants.id"), nullable=False
     )  # Index created via composite in __table_args__
-    user_hash = Column(String, nullable=False, index=True)  # Hashed user/session identifier
+    user_hash = Column(
+        String, nullable=False, index=True
+    )  # Hashed user/session identifier
     assigned_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Composite indexes for common queries
@@ -433,8 +488,9 @@ class UserConsent(Base):
     """
     User consent for tracking user consent (matches user_consents table in init script)
     """
+
     __tablename__ = "user_consents"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, nullable=False, index=True)
@@ -445,15 +501,18 @@ class UserConsent(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
     withdrawn_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class AuditTrail(Base):
     """
     Audit trail for tracking system events (matches audit_trails table in init script)
     """
+
     __tablename__ = "audit_trails"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=True)
@@ -487,7 +546,9 @@ class DatabaseManager:
             Base.metadata.create_all(bind=engine, checkfirst=True)
             logger.info("Database tables created successfully")
         except Exception as e:
-            logger.warning(f"Table creation warning (safe to ignore if tables exist): {str(e)}")
+            logger.warning(
+                f"Table creation warning (safe to ignore if tables exist): {str(e)}"
+            )
 
     def start_cleanup_job(self):
         """
@@ -506,7 +567,9 @@ class DatabaseManager:
         # Also schedule shutdown handler
         import atexit
 
-        atexit.register(lambda: self.scheduler.shutdown() if self.scheduler.running else None)
+        atexit.register(
+            lambda: self.scheduler.shutdown() if self.scheduler.running else None
+        )
 
     def get_db(self):
         """
@@ -550,7 +613,9 @@ class DatabaseManager:
         try:
             # Find and delete expired metrics
             expired_before = datetime.now(UTC)
-            deleted_count = db.query(AdMetric).filter(AdMetric.expires_at < expired_before).delete()
+            deleted_count = (
+                db.query(AdMetric).filter(AdMetric.expires_at < expired_before).delete()
+            )
             db.commit()
             logger.info(f"Cleaned up {deleted_count} expired ad metrics")
         except Exception as e:

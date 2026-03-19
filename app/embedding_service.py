@@ -36,7 +36,9 @@ class EmbeddingService:
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             self._load_model()
         else:
-            logger.warning("Using fallback random embeddings (install sentence-transformers for real embeddings)")
+            logger.warning(
+                "Using fallback random embeddings (install sentence-transformers for real embeddings)"
+            )
 
     def _load_model(self):
         """Load the sentence transformer model"""
@@ -44,7 +46,9 @@ class EmbeddingService:
             logger.info(f"Loading embedding model: {self.model_name}")
             self.model = SentenceTransformer(self.model_name)
             self.embedding_dim = self.model.get_sentence_embedding_dimension()
-            logger.info(f"Model loaded successfully. Embedding dimension: {self.embedding_dim}")
+            logger.info(
+                f"Model loaded successfully. Embedding dimension: {self.embedding_dim}"
+            )
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             self.model = None
@@ -63,22 +67,33 @@ class EmbeddingService:
         if self.model is None:
             # Fallback: random embeddings (for testing without model)
             logger.warning("Using fallback random embeddings")
-            embeddings = np.random.randn(len(texts), self.embedding_dim).astype(np.float32)
+            embeddings = np.random.randn(len(texts), self.embedding_dim).astype(
+                np.float32
+            )
             if normalize:
-                embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+                embeddings = embeddings / np.linalg.norm(
+                    embeddings, axis=1, keepdims=True
+                )
             return embeddings
 
         try:
             embeddings = self.model.encode(
-                texts, convert_to_numpy=True, normalize_embeddings=normalize, show_progress_bar=False
+                texts,
+                convert_to_numpy=True,
+                normalize_embeddings=normalize,
+                show_progress_bar=False,
             )
             return embeddings.astype(np.float32)
         except Exception as e:
             logger.error(f"Encoding failed: {e}")
             # Fallback to random
-            embeddings = np.random.randn(len(texts), self.embedding_dim).astype(np.float32)
+            embeddings = np.random.randn(len(texts), self.embedding_dim).astype(
+                np.float32
+            )
             if normalize:
-                embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+                embeddings = embeddings / np.linalg.norm(
+                    embeddings, axis=1, keepdims=True
+                )
             return embeddings
 
     def encode_query(self, query: str) -> list[float]:

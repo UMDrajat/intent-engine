@@ -6,7 +6,7 @@ with proper readiness and liveness probes.
 
 Usage:
     from app.config.health_checks import HealthCheckService
-    
+
     checker = HealthCheckService()
     status = await checker.check_all()
 """
@@ -86,7 +86,10 @@ class SystemHealth:
         return {
             "status": self.status.value,
             "timestamp": self.timestamp.isoformat(),
-            "services": {service.value: health.to_dict() for service, health in self.services.items()},
+            "services": {
+                service.value: health.to_dict()
+                for service, health in self.services.items()
+            },
             "version": self.version,
             "environment": self.environment,
             "uptime_seconds": self.uptime_seconds,
@@ -122,10 +125,18 @@ class HealthCheckService:
 
         self.database_url = database_url or os.getenv("DATABASE_URL")
         self.redis_url = redis_url or os.getenv("REDIS_URL")
-        self.searxng_url = searxng_url or os.getenv("SEARXNG_BASE_URL", "http://searxng:8080")
-        self.go_crawler_url = go_crawler_url or os.getenv("GO_CRAWLER_URL", "http://go-crawler:8080")
-        self.go_indexer_url = go_indexer_url or os.getenv("GO_INDEXER_URL", "http://go-indexer:8080")
-        self.go_search_api_url = go_search_api_url or os.getenv("GO_SEARCH_API_URL", "http://127.0.0.1:8081")
+        self.searxng_url = searxng_url or os.getenv(
+            "SEARXNG_BASE_URL", "http://searxng:8080"
+        )
+        self.go_crawler_url = go_crawler_url or os.getenv(
+            "GO_CRAWLER_URL", "http://go-crawler:8080"
+        )
+        self.go_indexer_url = go_indexer_url or os.getenv(
+            "GO_INDEXER_URL", "http://go-indexer:8080"
+        )
+        self.go_search_api_url = go_search_api_url or os.getenv(
+            "GO_SEARCH_API_URL", "http://127.0.0.1:8081"
+        )
         self.unified_search_url = unified_search_url or os.getenv(
             "UNIFIED_SEARCH_URL", "http://127.0.0.1:8082"
         )
@@ -186,7 +197,10 @@ class HealthCheckService:
                 service=ServiceType.DATABASE,
                 status=HealthStatus.HEALTHY,
                 response_time_ms=round(response_time, 2),
-                details={"url": self._sanitize_url(self.database_url), "driver": "sync"},
+                details={
+                    "url": self._sanitize_url(self.database_url),
+                    "driver": "sync",
+                },
             )
         except Exception as e:
             response_time = (time.time() - start) * 1000
@@ -225,7 +239,10 @@ class HealthCheckService:
                 service=ServiceType.REDIS,
                 status=HealthStatus.HEALTHY,
                 response_time_ms=round(response_time, 2),
-                details={"version": redis_version, "url": self._sanitize_url(self.redis_url)},
+                details={
+                    "version": redis_version,
+                    "url": self._sanitize_url(self.redis_url),
+                },
             )
         except Exception as e:
             response_time = (time.time() - start) * 1000
@@ -277,7 +294,9 @@ class HealthCheckService:
                             details["note"] = "Received HTML response, status OK"
                             # Limit text to avoid bloating health check
                             text = await response.text()
-                            details["response_preview"] = text[:100] + "..." if len(text) > 100 else text
+                            details["response_preview"] = (
+                                text[:100] + "..." if len(text) > 100 else text
+                            )
 
                         return ServiceHealth(
                             service=ServiceType.SEARXNG,
@@ -287,14 +306,19 @@ class HealthCheckService:
                         )
                     else:
                         # Try alternative endpoint
-                        async with session.get(f"{self.searxng_url.rstrip('/')}/stats") as alt_response:
+                        async with session.get(
+                            f"{self.searxng_url.rstrip('/')}/stats"
+                        ) as alt_response:
                             if alt_response.status == 200:
                                 response_time = (time.time() - start) * 1000
                                 return ServiceHealth(
                                     service=ServiceType.SEARXNG,
                                     status=HealthStatus.HEALTHY,
                                     response_time_ms=round(response_time, 2),
-                                    details={"url": f"{self.searxng_url}/stats", "fallback": True},
+                                    details={
+                                        "url": f"{self.searxng_url}/stats",
+                                        "fallback": True,
+                                    },
                                 )
 
                         raise Exception(f"Status {response.status}")
@@ -359,15 +383,18 @@ class HealthCheckService:
     async def check_go_search_api(self) -> ServiceHealth:
         """Check Go Search API health."""
         start = time.time()
-        
+
         # Check if Go services are enabled
         if os.getenv("ENABLE_GO_SERVICES", "false").lower() != "true":
             return ServiceHealth(
                 service=ServiceType.GO_SEARCH_API,
                 status=HealthStatus.HEALTHY,
-                details={"status": "not_enabled", "note": "Set ENABLE_GO_SERVICES=true to enable"},
+                details={
+                    "status": "not_enabled",
+                    "note": "Set ENABLE_GO_SERVICES=true to enable",
+                },
             )
-        
+
         try:
             timeout = aiohttp.ClientTimeout(total=5)
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -409,15 +436,18 @@ class HealthCheckService:
     async def check_unified_search(self) -> ServiceHealth:
         """Check Unified Search API health."""
         start = time.time()
-        
+
         # Check if Go services are enabled
         if os.getenv("ENABLE_GO_SERVICES", "false").lower() != "true":
             return ServiceHealth(
                 service=ServiceType.UNIFIED_SEARCH,
                 status=HealthStatus.HEALTHY,
-                details={"status": "not_enabled", "note": "Set ENABLE_GO_SERVICES=true to enable"},
+                details={
+                    "status": "not_enabled",
+                    "note": "Set ENABLE_GO_SERVICES=true to enable",
+                },
             )
-        
+
         try:
             timeout = aiohttp.ClientTimeout(total=5)
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -464,7 +494,10 @@ class HealthCheckService:
             return ServiceHealth(
                 service=ServiceType.QDRANT,
                 status=HealthStatus.HEALTHY,
-                details={"status": "not_enabled", "note": "Set ENABLE_QDRANT=true to enable"},
+                details={
+                    "status": "not_enabled",
+                    "note": "Set ENABLE_QDRANT=true to enable",
+                },
             )
 
         try:
@@ -481,7 +514,10 @@ class HealthCheckService:
                             service=ServiceType.QDRANT,
                             status=HealthStatus.HEALTHY,
                             response_time_ms=round(response_time, 2),
-                            details={"url": url, "version": data.get("version", "unknown")},
+                            details={
+                                "url": url,
+                                "version": data.get("version", "unknown"),
+                            },
                         )
                     else:
                         raise Exception(f"Status {response.status}")
@@ -595,16 +631,16 @@ class HealthCheckService:
             elif isinstance(result, Exception):
                 logger.error(f"Health check task failed: {result}")
 
-        # Add models check (synchronous but wrapped in executor for consistency if needed, 
+        # Add models check (synchronous but wrapped in executor for consistency if needed,
         # or just run it directly as it's fast)
         services[ServiceType.MODELS] = self.check_models()
 
         # Determine overall status
         # Only certain services mark the entire system as unhealthy
         critical_services = [ServiceType.DATABASE, ServiceType.REDIS]
-        
+
         overall_status = HealthStatus.HEALTHY
-        
+
         for service_type, health in services.items():
             if health.status == HealthStatus.UNHEALTHY:
                 if service_type in critical_services:
@@ -612,12 +648,16 @@ class HealthCheckService:
                     break
                 else:
                     overall_status = HealthStatus.DEGRADED
-            elif health.status == HealthStatus.DEGRADED and overall_status == HealthStatus.HEALTHY:
+            elif (
+                health.status == HealthStatus.DEGRADED
+                and overall_status == HealthStatus.HEALTHY
+            ):
                 overall_status = HealthStatus.DEGRADED
 
         # Get version
         try:
             from app.__version__ import __version__
+
             version = __version__
         except ImportError:
             version = "unknown"

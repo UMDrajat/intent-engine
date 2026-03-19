@@ -52,7 +52,9 @@ def query_searxng(
     except requests.exceptions.ConnectionError:
         print(f"\n❌ Cannot connect to SearXNG at {searxng_url}")
         print("   Make sure SearXNG is running:")
-        print('   cd "intent engine" && docker compose -f docker-compose.searxng.yml up -d')
+        print(
+            '   cd "intent engine" && docker compose -f docker-compose.searxng.yml up -d'
+        )
         sys.exit(1)
     except requests.exceptions.HTTPError as e:
         print(f"\n❌ SearXNG returned an error: {e}")
@@ -212,7 +214,9 @@ def print_ranked_results(
             if len(snippet) > 120:
                 snippet_clean += "..."
             print(f"      📝 {snippet_clean}")
-        print(f"      📊 Score: {final:.3f} | Relevance: {relevance:.3f} | Privacy: {privacy:.2f} ({privacy_badge})")
+        print(
+            f"      📊 Score: {final:.3f} | Relevance: {relevance:.3f} | Privacy: {privacy:.2f} ({privacy_badge})"
+        )
         print(f"      🏷️  {' | '.join(tags)}")
         print(f"      📂 Type: {content_type}")
 
@@ -221,7 +225,9 @@ def print_ranked_results(
     print("📊 SUMMARY")
     print("-" * 80)
 
-    avg_privacy = sum(r.get("privacy_score", 0) for r in ranked) / len(ranked) if ranked else 0
+    avg_privacy = (
+        sum(r.get("privacy_score", 0) for r in ranked) / len(ranked) if ranked else 0
+    )
     oss_count = sum(1 for r in ranked if r.get("is_open_source", False))
     no_tracker_count = sum(1 for r in ranked if r.get("tracker_count", 0) == 0)
 
@@ -233,7 +239,9 @@ def print_ranked_results(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Demo: SearXNG + Intent Engine Privacy-Aware URL Ranking")
+    parser = argparse.ArgumentParser(
+        description="Demo: SearXNG + Intent Engine Privacy-Aware URL Ranking"
+    )
     parser.add_argument("query", help="Search query")
     parser.add_argument(
         "--num-results",

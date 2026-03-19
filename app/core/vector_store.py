@@ -77,14 +77,20 @@ class QdrantVectorStore:
     def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or {}
         self.collection_name = self.config.get("collection", "intent_index")
-        self.qdrant_url = self.config.get("url", os.getenv("QDRANT_URL", "http://localhost:6333"))
-        self.embedding_dim = self.config.get("embedding_dim", 384)  # sentence-transformers
+        self.qdrant_url = self.config.get(
+            "url", os.getenv("QDRANT_URL", "http://localhost:6333")
+        )
+        self.embedding_dim = self.config.get(
+            "embedding_dim", 384
+        )  # sentence-transformers
 
         self._client = None
         self._embedding_service = None
         self._initialized = False
 
-        logger.info(f"QdrantVectorStore initialized: collection={self.collection_name}, url={self.qdrant_url}")
+        logger.info(
+            f"QdrantVectorStore initialized: collection={self.collection_name}, url={self.qdrant_url}"
+        )
 
     def _ensure_initialized(self):
         """Lazy initialization of Qdrant client"""
@@ -104,7 +110,9 @@ class QdrantVectorStore:
             logger.info("Qdrant client initialized successfully")
 
         except ImportError:
-            logger.warning("qdrant-client not installed. Install with: pip install qdrant-client")
+            logger.warning(
+                "qdrant-client not installed. Install with: pip install qdrant-client"
+            )
             self._client = None
         except Exception as e:
             logger.warning(f"Failed to initialize Qdrant client: {e}")

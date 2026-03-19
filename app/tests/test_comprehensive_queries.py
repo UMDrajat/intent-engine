@@ -506,7 +506,8 @@ class ComprehensiveQueryTestSuite:
         # Validate results
         validations = {
             "goal_match": declared.get("goal") == test_query.expected_goal,
-            "complexity_match": inferred.get("complexity") == test_query.expected_complexity,
+            "complexity_match": inferred.get("complexity")
+            == test_query.expected_complexity,
             "has_intent_id": bool(intent.get("intentId")),
             "has_constraints": len(declared.get("constraints", [])) > 0,
         }
@@ -522,7 +523,9 @@ class ComprehensiveQueryTestSuite:
             "latency_ms": elapsed,
         }
 
-    def test_url_ranking(self, test_query: TestQuery, urls: list[str]) -> dict[str, Any]:
+    def test_url_ranking(
+        self, test_query: TestQuery, urls: list[str]
+    ) -> dict[str, Any]:
         """Test URL ranking for a query"""
         print(f"  Ranking {len(urls)} URLs...")
 
@@ -531,7 +534,12 @@ class ComprehensiveQueryTestSuite:
             "urls": urls,
             "options": {
                 "exclude_big_tech": True,
-                "weights": {"relevance": 0.40, "privacy": 0.30, "quality": 0.20, "ethics": 0.10},
+                "weights": {
+                    "relevance": 0.40,
+                    "privacy": 0.30,
+                    "quality": 0.20,
+                    "ethics": 0.10,
+                },
             },
         }
 
@@ -540,7 +548,11 @@ class ComprehensiveQueryTestSuite:
         elapsed = (time.time() - start_time) * 1000
 
         if response.status_code != 200:
-            return {"status": "FAILED", "error": f"HTTP {response.status_code}", "latency_ms": elapsed}
+            return {
+                "status": "FAILED",
+                "error": f"HTTP {response.status_code}",
+                "latency_ms": elapsed,
+            }
 
         data = response.json()
         ranked_urls = data.get("ranked_urls", [])
@@ -590,7 +602,9 @@ class ComprehensiveQueryTestSuite:
                 # Test URL ranking
                 if result["status"] == "PASSED":
                     rank_result = self.test_url_ranking(test_query, test_urls)
-                    print(f"  URL Ranking: {rank_result['status']} ({rank_result['latency_ms']:.0f}ms)")
+                    print(
+                        f"  URL Ranking: {rank_result['status']} ({rank_result['latency_ms']:.0f}ms)"
+                    )
 
             # Category statistics
             passed = sum(1 for r in category_results if r["status"] == "PASSED")
@@ -606,7 +620,9 @@ class ComprehensiveQueryTestSuite:
                 "avg_latency_ms": avg_latency,
             }
 
-            print(f"\n  Category Summary: {passed}/{len(category_results)} passed, avg latency: {avg_latency:.0f}ms")
+            print(
+                f"\n  Category Summary: {passed}/{len(category_results)} passed, avg latency: {avg_latency:.0f}ms"
+            )
 
         # Overall summary
         print("\n" + "=" * 70)
@@ -627,7 +643,9 @@ class ComprehensiveQueryTestSuite:
 
         print("\nCategory Breakdown:")
         for cat, stats in category_stats.items():
-            print(f"  {cat:20s}: {stats['passed']}/{stats['total']} passed, {stats['avg_latency_ms']:.0f}ms avg")
+            print(
+                f"  {cat:20s}: {stats['passed']}/{stats['total']} passed, {stats['avg_latency_ms']:.0f}ms avg"
+            )
 
         print("=" * 70)
 

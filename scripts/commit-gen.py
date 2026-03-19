@@ -36,9 +36,15 @@ def guess_commit_type(files):
     if not files:
         return "feat"
 
-    docs_count = sum(1 for f in files if any(x in f.lower() for x in [".md", "docs/", "readme"]))
+    docs_count = sum(
+        1 for f in files if any(x in f.lower() for x in [".md", "docs/", "readme"])
+    )
     test_count = sum(1 for f in files if any(x in f.lower() for x in ["test", "spec"]))
-    config_count = sum(1 for f in files if any(x in f.lower() for x in [".yml", ".yaml", ".toml", ".ini", ".github/"]))
+    config_count = sum(
+        1
+        for f in files
+        if any(x in f.lower() for x in [".yml", ".yaml", ".toml", ".ini", ".github/"])
+    )
 
     if docs_count > len(files) / 2:
         return "docs"
@@ -46,7 +52,9 @@ def guess_commit_type(files):
         return "test"
     elif config_count > len(files) / 2:
         return "ci"
-    elif any("hook" in f or "lint" in f or "format" in f or ".pre-commit" in f for f in files):
+    elif any(
+        "hook" in f or "lint" in f or "format" in f or ".pre-commit" in f for f in files
+    ):
         return "style"
 
     return "feat"
@@ -137,13 +145,17 @@ def interactive_mode():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate professional commit messages")
+    parser = argparse.ArgumentParser(
+        description="Generate professional commit messages"
+    )
     parser.add_argument("--fix", action="store_true", help="Generate a fix commit")
     parser.add_argument("--feat", action="store_true", help="Generate a feat commit")
     parser.add_argument("--docs", action="store_true", help="Generate a docs commit")
     parser.add_argument("--test", action="store_true", help="Generate a test commit")
     parser.add_argument("--chore", action="store_true", help="Generate a chore commit")
-    parser.add_argument("--interactive", "-i", action="store_true", help="Interactive mode")
+    parser.add_argument(
+        "--interactive", "-i", action="store_true", help="Interactive mode"
+    )
 
     args = parser.parse_args()
 

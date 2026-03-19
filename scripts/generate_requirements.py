@@ -61,7 +61,9 @@ def generate_requirements_files():
     # Generate requirements.txt (production dependencies)
     prod_deps = []
     prod_deps.append("# Auto-generated from pyproject.toml")
-    prod_deps.append("# DO NOT EDIT MANUALLY - run: python scripts/generate_requirements.py")
+    prod_deps.append(
+        "# DO NOT EDIT MANUALLY - run: python scripts/generate_requirements.py"
+    )
     prod_deps.append("")
     for dep in dependencies:
         # Skip comment lines
@@ -78,7 +80,9 @@ def generate_requirements_files():
     # Generate requirements-dev.txt (development dependencies)
     dev_deps = []
     dev_deps.append("# Auto-generated from pyproject.toml")
-    dev_deps.append("# DO NOT EDIT MANUALLY - run: python scripts/generate_requirements.py")
+    dev_deps.append(
+        "# DO NOT EDIT MANUALLY - run: python scripts/generate_requirements.py"
+    )
     dev_deps.append("")
     dev_deps.append("# Testing")
 
@@ -106,8 +110,12 @@ def generate_requirements_files():
 
     # Print summary
     print("\n📊 Summary:")
-    print(f"  Production dependencies: {len([d for d in dependencies if not d.strip().startswith('#')])}")
-    print(f"  Dev dependencies: {len([d for d in dev_optional if not d.strip().startswith('#')])}")
+    print(
+        f"  Production dependencies: {len([d for d in dependencies if not d.strip().startswith('#')])}"
+    )
+    print(
+        f"  Dev dependencies: {len([d for d in dev_optional if not d.strip().startswith('#')])}"
+    )
 
     # Check for optional dependency groups
     if optional_dependencies:

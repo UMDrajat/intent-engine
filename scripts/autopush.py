@@ -31,7 +31,9 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 _script_dir = os.path.dirname(os.path.abspath(__file__))
-_spec = importlib.util.spec_from_file_location("commit_gen", os.path.join(_script_dir, "commit-gen.py"))
+_spec = importlib.util.spec_from_file_location(
+    "commit_gen", os.path.join(_script_dir, "commit-gen.py")
+)
 _commit_gen = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_commit_gen)
 
@@ -44,8 +46,19 @@ get_diff_stats = _commit_gen.get_diff_stats
 def run_cmd(cmd, capture=True):
     """Run a command (list or string) and return (returncode, stdout, stderr)."""
     use_shell = isinstance(cmd, str)
-    result = subprocess.run(cmd, shell=use_shell, capture_output=capture, text=True, encoding="utf-8", errors="replace")
-    return result.returncode, (result.stdout or "").strip(), (result.stderr or "").strip()
+    result = subprocess.run(
+        cmd,
+        shell=use_shell,
+        capture_output=capture,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    return (
+        result.returncode,
+        (result.stdout or "").strip(),
+        (result.stderr or "").strip(),
+    )
 
 
 def has_changes():
@@ -63,7 +76,11 @@ def has_staged_changes():
 def get_all_changed_files():
     """Get all changed files (staged + unstaged + untracked) via git status."""
     result = subprocess.run(
-        ["git", "status", "--porcelain"], capture_output=True, text=True, encoding="utf-8", errors="replace"
+        ["git", "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     raw = result.stdout.rstrip()
     if not raw:
@@ -172,7 +189,9 @@ def sync_with_remote(branch):
         return True
 
     # Check if remote is ahead
-    code, counts, _ = run_cmd(f"git rev-list --left-right --count HEAD...origin/{branch}")
+    code, counts, _ = run_cmd(
+        f"git rev-list --left-right --count HEAD...origin/{branch}"
+    )
     if code != 0:
         print("  [!] Could not compare with remote, continuing...")
         return True
@@ -198,7 +217,9 @@ def sync_with_remote(branch):
 
     # Pull with rebase
     print(f"\n  Rebasing onto origin/{branch}...")
-    code, out, err = run_cmd(["git", "pull", "--rebase", "--no-verify", "origin", branch])
+    code, out, err = run_cmd(
+        ["git", "pull", "--rebase", "--no-verify", "origin", branch]
+    )
     if code != 0:
         print(f"  [X] Rebase failed: {err or out}")
         print("  Aborting rebase...")
@@ -211,11 +232,19 @@ def sync_with_remote(branch):
 
 def main():
     parser = argparse.ArgumentParser(description="Auto commit, check, and push")
-    parser.add_argument("-m", "--message", help="Override auto-generated commit message")
-    parser.add_argument("--no-check", action="store_true", help="Skip lint/format checks")
+    parser.add_argument(
+        "-m", "--message", help="Override auto-generated commit message"
+    )
+    parser.add_argument(
+        "--no-check", action="store_true", help="Skip lint/format checks"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Show what would happen")
-    parser.add_argument("--staged", action="store_true", help="Only commit already-staged files")
-    parser.add_argument("--fix", action="store_true", help="Auto-fix lint/format before committing")
+    parser.add_argument(
+        "--staged", action="store_true", help="Only commit already-staged files"
+    )
+    parser.add_argument(
+        "--fix", action="store_true", help="Auto-fix lint/format before committing"
+    )
     args = parser.parse_args()
 
     print("=" * 50)

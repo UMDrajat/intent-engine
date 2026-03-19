@@ -4,12 +4,16 @@ Unit tests for programming error detection module
 
 import unittest
 
-from app.core.schema import (ErrorType, IntentGoal, ProgrammingContext,
-                         ProgrammingLanguage, UseCase)
+from app.core.schema import (
+    ErrorType,
+    IntentGoal,
+    ProgrammingContext,
+    ProgrammingLanguage,
+    UseCase,
+)
 from app.extraction.programming_error_detector import (
     CodeSnippetDetector,
     ErrorMessageParser,
-    ProgrammingIntentExtractor,
     get_programming_intent_extractor,
 )
 
@@ -57,7 +61,7 @@ class TestProgrammingLanguageDetector(unittest.TestCase):
             ("public class Main {\n    public static void main(String[] args) {", True),
             ("System.out.println('Hello');", True),
             ("java.lang.NullPointerException", True),
-            ("Exception in thread \"main\"", True),
+            ('Exception in thread "main"', True),
         ]
 
         for text, should_be_java in test_cases:
@@ -102,8 +106,9 @@ class TestErrorMessageParser(unittest.TestCase):
 
         for error_msg, expected_type in test_cases:
             result = self.parser.parse_error_message(error_msg)
-            self.assertEqual(result["error_type"], expected_type,
-                           f"Failed for: {error_msg}")
+            self.assertEqual(
+                result["error_type"], expected_type, f"Failed for: {error_msg}"
+            )
 
     def test_parse_javascript_error(self):
         """Test JavaScript error message parsing"""
@@ -124,8 +129,9 @@ class TestErrorMessageParser(unittest.TestCase):
 
         for error_msg, expected_type in test_cases:
             result = self.parser.parse_error_message(error_msg)
-            self.assertEqual(result["error_type"], expected_type,
-                           f"Failed for: {error_msg}")
+            self.assertEqual(
+                result["error_type"], expected_type, f"Failed for: {error_msg}"
+            )
 
     def test_extract_stack_trace(self):
         """Test stack trace extraction"""

@@ -18,7 +18,9 @@ import sys
 from datetime import datetime
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +37,9 @@ def initialize_database() -> bool:
         True if successful, False otherwise
     """
     database_url = get_database_url()
-    logger.info(f"Initializing database: {database_url.split('@')[0] if '@' in database_url else database_url}")
+    logger.info(
+        f"Initializing database: {database_url.split('@')[0] if '@' in database_url else database_url}"
+    )
 
     try:
         # Import database module
@@ -77,13 +81,17 @@ def run_migrations() -> bool:
     """
     import subprocess
 
-    migrations_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "migrations")
+    migrations_dir = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "migrations"
+    )
 
     if not os.path.exists(migrations_dir):
         logger.warning(f"Migrations directory not found: {migrations_dir}")
         return True
 
-    migration_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith(".sql")])
+    migration_files = sorted(
+        [f for f in os.listdir(migrations_dir) if f.endswith(".sql")]
+    )
 
     if not migration_files:
         logger.info("No SQL migrations found")
@@ -105,11 +113,16 @@ def run_migrations() -> bool:
         try:
             # Use psql to run migration
             result = subprocess.run(
-                ["psql", database_url, "-f", migration_path], capture_output=True, text=True, timeout=30
+                ["psql", database_url, "-f", migration_path],
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
 
             if result.returncode != 0:
-                logger.warning(f"Migration {migration_file} had issues: {result.stderr}")
+                logger.warning(
+                    f"Migration {migration_file} had issues: {result.stderr}"
+                )
             else:
                 logger.info(f"Migration {migration_file} completed")
 

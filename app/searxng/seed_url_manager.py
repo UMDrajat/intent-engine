@@ -19,12 +19,16 @@ class SeedURLManager:
     """Manages automatic seeding of URLs from search results to crawler"""
 
     def __init__(self, redis_host: str = "redis", redis_port: int = 6379):
-        self.redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+        self.redis_client = redis.Redis(
+            host=redis_host, port=redis_port, decode_responses=True
+        )
         self.crawl_queue = "crawl_queue"
         self.visited_key_prefix = "visited_urls:"
         self.search_results_key = "search_results_urls"
 
-    def add_urls_to_crawl_queue(self, urls: list[str], priority: int = 5, depth: int = 1) -> int:
+    def add_urls_to_crawl_queue(
+        self, urls: list[str], priority: int = 5, depth: int = 1
+    ) -> int:
         """
         Add URLs to the Go crawler queue
 
@@ -61,7 +65,9 @@ class SeedURLManager:
             }
 
             # Add to crawl queue (sorted set with priority as score)
-            self.redis_client.zadd(self.crawl_queue, {json.dumps(item): float(priority)})
+            self.redis_client.zadd(
+                self.crawl_queue, {json.dumps(item): float(priority)}
+            )
 
             # Mark as pending visit (24 hour TTL)
             self.redis_client.setex(visited_key, 86400, "1")
@@ -73,11 +79,15 @@ class SeedURLManager:
             logger.info(f"Added URL to crawl queue: {url} (priority={priority})")
 
         if added_count > 0:
-            logger.info(f"Added {added_count} new URLs to crawl queue from search results")
+            logger.info(
+                f"Added {added_count} new URLs to crawl queue from search results"
+            )
 
         return added_count
 
-    def extract_urls_from_searxng_results(self, searxng_results: list[dict[str, Any]]) -> list[str]:
+    def extract_urls_from_searxng_results(
+        self, searxng_results: list[dict[str, Any]]
+    ) -> list[str]:
         """
         Extract unique URLs from SearXNG search results
 
@@ -159,11 +169,22 @@ class SeedURLManager:
         """Get crawl queue statistics"""
         try:
             queue_size = self.redis_client.zcard(self.crawl_queue)
-            total_added = self.redis_client.hget(self.search_results_key, "total_added") or 0
+            total_added = (
+                self.redis_client.hget(self.search_results_key, "total_added") or 0
+            )
 
-            return {"queue_size": queue_size, "total_added_from_search": int(total_added), "status": "active"}
+            return {
+                "queue_size": queue_size,
+                "total_added_from_search": int(total_added),
+                "status": "active",
+            }
         except Exception as e:
-            return {"queue_size": 0, "total_added_from_search": 0, "status": "error", "error": str(e)}
+            return {
+                "queue_size": 0,
+                "total_added_from_search": 0,
+                "status": "error",
+                "error": str(e),
+            }
 
     def close(self):
         """Close Redis connection"""

@@ -81,8 +81,12 @@ async def enrich_document_intent(ctx, page_id: int, url: str, title: str, conten
             "page_id": page_id,
             "url": url,
             "intent": {
-                "goal": extraction_res.universal_intent.goal if extraction_res.universal_intent else "information",
-                "topics": extraction_res.universal_intent.use_cases if extraction_res.universal_intent else [],
+                "goal": extraction_res.universal_intent.goal
+                if extraction_res.universal_intent
+                else "information",
+                "topics": extraction_res.universal_intent.use_cases
+                if extraction_res.universal_intent
+                else [],
                 "complexity": extraction_res.universal_intent.skill_level
                 if extraction_res.universal_intent
                 else "beginner",

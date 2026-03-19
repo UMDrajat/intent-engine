@@ -31,7 +31,10 @@ class ScheduledSeedDiscovery:
     """
 
     def __init__(
-        self, discovery_interval_hours: int = 24, topic_expansion_interval_hours: int = 6, max_urls_per_run: int = 50
+        self,
+        discovery_interval_hours: int = 24,
+        topic_expansion_interval_hours: int = 6,
+        max_urls_per_run: int = 50,
     ):
         self.discovery_interval_hours = discovery_interval_hours
         self.topic_expansion_interval_hours = topic_expansion_interval_hours
@@ -92,7 +95,9 @@ class ScheduledSeedDiscovery:
         try:
             # Get expanded topics
             if self.topic_expander:
-                expanded_topics = await self.topic_expander.get_expanded_topics(limit_per_category=15)
+                expanded_topics = await self.topic_expander.get_expanded_topics(
+                    limit_per_category=15
+                )
                 logger.info(
                     f"Using {sum(len(t) for t in expanded_topics.values())} topics "
                     f"from {len(expanded_topics)} categories"
@@ -100,7 +105,9 @@ class ScheduledSeedDiscovery:
 
             results = await inject_discovered_urls()
 
-            urls_found = results.get("go_urls_discovered", 0) + results.get("prog_urls_discovered", 0)
+            urls_found = results.get("go_urls_discovered", 0) + results.get(
+                "prog_urls_discovered", 0
+            )
 
             self.total_urls_discovered += urls_found
 
@@ -151,7 +158,9 @@ class ScheduledSeedDiscovery:
                     # Can't block in running loop, return basic stats
                     stats["topic_expander"] = "initialized"
                 else:
-                    stats["topic_expander"] = loop.run_until_complete(self.topic_expander.get_stats())
+                    stats["topic_expander"] = loop.run_until_complete(
+                        self.topic_expander.get_stats()
+                    )
             except:
                 stats["topic_expander"] = "initializing"
 
@@ -167,7 +176,9 @@ def get_seed_discovery() -> ScheduledSeedDiscovery:
     global _seed_discovery
     if _seed_discovery is None:
         _seed_discovery = ScheduledSeedDiscovery(
-            discovery_interval_hours=24, topic_expansion_interval_hours=6, max_urls_per_run=50
+            discovery_interval_hours=24,
+            topic_expansion_interval_hours=6,
+            max_urls_per_run=50,
         )
     return _seed_discovery
 

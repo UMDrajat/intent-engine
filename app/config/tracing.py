@@ -57,7 +57,9 @@ def setup_tracing(service_name: str = "intent-engine") -> Any | None:
         return None
 
     # Get exporter configuration
-    exporter_type = os.getenv("TRACING_EXPORTER", "console").lower()  # console, jaeger, otlp
+    exporter_type = os.getenv(
+        "TRACING_EXPORTER", "console"
+    ).lower()  # console, jaeger, otlp
     jaeger_endpoint = os.getenv("JAEGER_ENDPOINT", "http://localhost:14268/api/traces")
     otlp_endpoint = os.getenv("OTLP_ENDPOINT", "http://localhost:4317")
 
@@ -132,7 +134,9 @@ def setup_tracing(service_name: str = "intent-engine") -> Any | None:
         # Get tracer
         _tracer = trace.get_tracer(__name__)
 
-        logger.info(f"Distributed tracing setup complete: service={service_name}, exporter={exporter_type}")
+        logger.info(
+            f"Distributed tracing setup complete: service={service_name}, exporter={exporter_type}"
+        )
 
         return provider
 

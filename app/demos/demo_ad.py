@@ -56,7 +56,9 @@ def create_demo_intent():
         inferred=InferredIntent(
             useCases=[UseCase.LEARNING, UseCase.TROUBLESHOOTING],
             ethicalSignals=[
-                EthicalSignal(dimension=EthicalDimension.PRIVACY, preference="privacy-first"),
+                EthicalSignal(
+                    dimension=EthicalDimension.PRIVACY, preference="privacy-first"
+                ),
                 EthicalSignal(
                     dimension=EthicalDimension.OPENNESS,
                     preference="open-source_preferred",
@@ -79,7 +81,9 @@ def demo_ad_matching():
             f"  - {constraint.type.value} {constraint.dimension}: {constraint.value} "
             f"(hard filter: {constraint.hardFilter})"
         )
-    print(f"\nEthical Signals: {[(es.dimension.value, es.preference) for es in intent.inferred.ethicalSignals]}\n")
+    print(
+        f"\nEthical Signals: {[(es.dimension.value, es.preference) for es in intent.inferred.ethicalSignals]}\n"
+    )
 
     # Define ad inventory
     ads = [
@@ -159,7 +163,9 @@ def demo_ad_matching():
     print()
 
     # Create ad matching request
-    request = AdMatchingRequest(intent=intent, adInventory=ads, config={"topK": 5, "minThreshold": 0.4})
+    request = AdMatchingRequest(
+        intent=intent, adInventory=ads, config={"topK": 5, "minThreshold": 0.4}
+    )
 
     # Perform ad matching
     response = match_ads(request)

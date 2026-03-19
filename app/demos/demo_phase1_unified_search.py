@@ -81,7 +81,12 @@ async def test_query_router():
     from app.searxng.query_router import get_query_router
 
     # Configure router for local testing
-    router = get_query_router({"go_crawler_url": "http://localhost:8081", "searxng_url": "http://localhost:8080"})
+    router = get_query_router(
+        {
+            "go_crawler_url": "http://localhost:8081",
+            "searxng_url": "http://localhost:8080",
+        }
+    )
 
     # Test Case 1: Troubleshooting Query
     print_section("Test 1.1: Troubleshooting Query")
@@ -231,7 +236,12 @@ async def test_unified_search_service():
         from app.searxng.unified_search import get_unified_search_service
 
         # Configure router for local testing
-        get_query_router({"go_crawler_url": "http://localhost:8081", "searxng_url": "http://localhost:8080"})
+        get_query_router(
+            {
+                "go_crawler_url": "http://localhost:8081",
+                "searxng_url": "http://localhost:8080",
+            }
+        )
 
         service = get_unified_search_service()
 
@@ -337,12 +347,16 @@ async def test_web_intent_extractor():
 
 async def run_all_tests():
     """Run all Phase 1 integration tests"""
-    print(f"\n{Colors.HEADER}{Colors.BOLD}╔══════════════════════════════════════════════════════════╗")
+    print(
+        f"\n{Colors.HEADER}{Colors.BOLD}╔══════════════════════════════════════════════════════════╗"
+    )
     print("║                                                          ║")
     print("║     Intent Engine - Phase 1 Integration Demo             ║")
     print("║     Unified Search with Query Router & Aggregator        ║")
     print("║                                                          ║")
-    print(f"╚══════════════════════════════════════════════════════════╗{Colors.ENDC}\n")
+    print(
+        f"╚══════════════════════════════════════════════════════════╗{Colors.ENDC}\n"
+    )
 
     start_time = time.time()
 

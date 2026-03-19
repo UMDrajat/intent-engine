@@ -26,18 +26,29 @@ COMMIT_TYPES = {
     "feat": {"desc": "A new feature", "version": "minor"},
     "fix": {"desc": "A bug fix", "version": "patch"},
     "docs": {"desc": "Documentation only changes", "version": "patch"},
-    "style": {"desc": "Changes that don't affect meaning (formatting, etc)", "version": "patch"},
-    "refactor": {"desc": "Code change that neither fixes a bug nor adds a feature", "version": "patch"},
+    "style": {
+        "desc": "Changes that don't affect meaning (formatting, etc)",
+        "version": "patch",
+    },
+    "refactor": {
+        "desc": "Code change that neither fixes a bug nor adds a feature",
+        "version": "patch",
+    },
     "perf": {"desc": "Performance improvement", "version": "patch"},
     "test": {"desc": "Adding or correcting tests", "version": "patch"},
-    "chore": {"desc": "Changes to build process, tooling, or auxiliary files", "version": "patch"},
+    "chore": {
+        "desc": "Changes to build process, tooling, or auxiliary files",
+        "version": "patch",
+    },
     "ci": {"desc": "CI configuration changes", "version": "patch"},
 }
 
 
 def run_cmd(cmd, capture=True, check=False):
     """Run shell command and return output."""
-    result = subprocess.run(cmd, shell=True, capture_output=capture, text=True, check=check)
+    result = subprocess.run(
+        cmd, shell=True, capture_output=capture, text=True, check=check
+    )
     return result.stdout.strip() if capture else result.returncode
 
 
@@ -257,15 +268,28 @@ Examples:
         """,
     )
 
-    parser.add_argument("-t", "--type", choices=list(COMMIT_TYPES.keys()), help="Commit type (feat, fix, docs, etc.)")
+    parser.add_argument(
+        "-t",
+        "--type",
+        choices=list(COMMIT_TYPES.keys()),
+        help="Commit type (feat, fix, docs, etc.)",
+    )
     parser.add_argument("-s", "--scope", help="Commit scope (optional)")
     parser.add_argument("-m", "--message", help="Subject line (skip prompts)")
     parser.add_argument("-b", "--body", help="Commit body (optional)")
-    parser.add_argument("--breaking", action="store_true", help="Mark as breaking change")
-    parser.add_argument("--issue", action="append", help="Issue reference (e.g., 'Closes #123')")
-    parser.add_argument("--no-commit", action="store_true", help="Generate message only, don't commit")
+    parser.add_argument(
+        "--breaking", action="store_true", help="Mark as breaking change"
+    )
+    parser.add_argument(
+        "--issue", action="append", help="Issue reference (e.g., 'Closes #123')"
+    )
+    parser.add_argument(
+        "--no-commit", action="store_true", help="Generate message only, don't commit"
+    )
     parser.add_argument("--amend", action="store_true", help="Amend last commit")
-    parser.add_argument("--all", "-a", action="store_true", help="Stage all changes before committing")
+    parser.add_argument(
+        "--all", "-a", action="store_true", help="Stage all changes before committing"
+    )
 
     args = parser.parse_args()
 
@@ -336,12 +360,16 @@ Examples:
     # Issue references
     issues = args.issue or []
     if not issues:
-        issue_input = input("\nIssue references (e.g., 'Closes #123', press Enter to skip): ").strip()
+        issue_input = input(
+            "\nIssue references (e.g., 'Closes #123', press Enter to skip): "
+        ).strip()
         if issue_input:
             issues = issue_input.split()
 
     # Build commit message
-    commit_msg = build_commit_message(commit_type, scope, subject, body, breaking, issues)
+    commit_msg = build_commit_message(
+        commit_type, scope, subject, body, breaking, issues
+    )
 
     # Display preview
     print("\n" + "=" * 60)
@@ -363,7 +391,9 @@ Examples:
     # Commit
     print("\n📦 Committing...")
     amend_flag = "--amend" if args.amend else ""
-    result = subprocess.run(["git", "commit", amend_flag, "-m", commit_msg], capture_output=True, text=True)
+    result = subprocess.run(
+        ["git", "commit", amend_flag, "-m", commit_msg], capture_output=True, text=True
+    )
 
     if result.returncode != 0:
         print("\n❌ Commit failed:")

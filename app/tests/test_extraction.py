@@ -5,8 +5,15 @@ Unit tests for the intent_extractor module
 import copy
 import unittest
 
-from app.core.schema import (ConstraintType, EthicalDimension, Frequency,
-                         IntentGoal, Recency, SkillLevel, TemporalHorizon)
+from app.core.schema import (
+    ConstraintType,
+    EthicalDimension,
+    Frequency,
+    IntentGoal,
+    Recency,
+    SkillLevel,
+    TemporalHorizon,
+)
 from app.extraction.extractor import IntentExtractionRequest, extract_intent
 
 
@@ -15,7 +22,9 @@ class TestIntentExtractor(unittest.TestCase):
         """Set up test fixtures with deepcopy to prevent mutations"""
         self.base_request = IntentExtractionRequest(
             product="search",
-            input={"text": "How to set up E2E encrypted email on Android, no big tech solutions"},
+            input={
+                "text": "How to set up E2E encrypted email on Android, no big tech solutions"
+            },
             context={"sessionId": "test_session", "userLocale": "en-US"},
         )
         self.request = copy.deepcopy(self.base_request)
@@ -32,9 +41,13 @@ class TestIntentExtractor(unittest.TestCase):
         intent = response.intent
 
         android_constraints = [
-            c for c in intent.declared.constraints if c.dimension == "platform" and c.value == "Android"
+            c
+            for c in intent.declared.constraints
+            if c.dimension == "platform" and c.value == "Android"
         ]
-        self.assertTrue(len(android_constraints) > 0, "Should extract Android platform constraint")
+        self.assertTrue(
+            len(android_constraints) > 0, "Should extract Android platform constraint"
+        )
 
         # Test exclusion constraint extraction
         request = IntentExtractionRequest(
@@ -46,9 +59,13 @@ class TestIntentExtractor(unittest.TestCase):
         intent = response.intent
 
         exclusion_constraints = [
-            c for c in intent.declared.constraints if c.type == ConstraintType.EXCLUSION and c.dimension == "provider"
+            c
+            for c in intent.declared.constraints
+            if c.type == ConstraintType.EXCLUSION and c.dimension == "provider"
         ]
-        self.assertTrue(len(exclusion_constraints) > 0, "Should extract exclusion constraints")
+        self.assertTrue(
+            len(exclusion_constraints) > 0, "Should extract exclusion constraints"
+        )
 
         # Test exclusion constraint extraction
         request = IntentExtractionRequest(
@@ -60,9 +77,13 @@ class TestIntentExtractor(unittest.TestCase):
         intent = response.intent
 
         exclusion_constraints = [
-            c for c in intent.declared.constraints if c.type == ConstraintType.EXCLUSION and c.value == "Google"
+            c
+            for c in intent.declared.constraints
+            if c.type == ConstraintType.EXCLUSION and c.value == "Google"
         ]
-        self.assertTrue(len(exclusion_constraints) > 0, "Should extract Google exclusion constraint")
+        self.assertTrue(
+            len(exclusion_constraints) > 0, "Should extract Google exclusion constraint"
+        )
 
         # Test multiple exclusions
         request = IntentExtractionRequest(
@@ -74,9 +95,14 @@ class TestIntentExtractor(unittest.TestCase):
         intent = response.intent
 
         exclusion_constraints = [
-            c for c in intent.declared.constraints if c.type == ConstraintType.EXCLUSION and c.dimension == "provider"
+            c
+            for c in intent.declared.constraints
+            if c.type == ConstraintType.EXCLUSION and c.dimension == "provider"
         ]
-        self.assertTrue(len(exclusion_constraints) > 0, "Should extract big tech exclusion constraint")
+        self.assertTrue(
+            len(exclusion_constraints) > 0,
+            "Should extract big tech exclusion constraint",
+        )
 
         # Test feature constraint extraction
         request = IntentExtractionRequest(
@@ -88,9 +114,14 @@ class TestIntentExtractor(unittest.TestCase):
         intent = response.intent
 
         feature_constraints = [
-            c for c in intent.declared.constraints if c.dimension == "feature" and c.value == "end-to-end_encryption"
+            c
+            for c in intent.declared.constraints
+            if c.dimension == "feature" and c.value == "end-to-end_encryption"
         ]
-        self.assertTrue(len(feature_constraints) > 0, "Should extract end-to-end encryption feature constraint")
+        self.assertTrue(
+            len(feature_constraints) > 0,
+            "Should extract end-to-end encryption feature constraint",
+        )
 
     def test_goal_classification(self):
         """Test goal classification functionality"""
@@ -103,7 +134,9 @@ class TestIntentExtractor(unittest.TestCase):
         response = extract_intent(request)
         intent = response.intent
 
-        self.assertEqual(intent.declared.goal, IntentGoal.LEARN, "Should classify as LEARN goal")
+        self.assertEqual(
+            intent.declared.goal, IntentGoal.LEARN, "Should classify as LEARN goal"
+        )
 
         # Test COMPARISON goal
         request = IntentExtractionRequest(
@@ -161,7 +194,11 @@ class TestIntentExtractor(unittest.TestCase):
         response = extract_intent(request)
         intent = response.intent
 
-        privacy_signals = [s for s in intent.inferred.ethicalSignals if s.dimension == EthicalDimension.PRIVACY]
+        privacy_signals = [
+            s
+            for s in intent.inferred.ethicalSignals
+            if s.dimension == EthicalDimension.PRIVACY
+        ]
         self.assertTrue(len(privacy_signals) > 0, "Should infer privacy ethical signal")
 
     def test_temporal_intent_parsing(self):
@@ -176,15 +213,25 @@ class TestIntentExtractor(unittest.TestCase):
 
         temporal_intent = intent.inferred.temporalIntent
         self.assertIsNotNone(temporal_intent, "Should have temporal intent")
-        self.assertIsInstance(temporal_intent.horizon, TemporalHorizon, "Horizon should be TemporalHorizon enum")
-        self.assertIsInstance(temporal_intent.recency, Recency, "Recency should be Recency enum")
-        self.assertIsInstance(temporal_intent.frequency, Frequency, "Frequency should be Frequency enum")
+        self.assertIsInstance(
+            temporal_intent.horizon,
+            TemporalHorizon,
+            "Horizon should be TemporalHorizon enum",
+        )
+        self.assertIsInstance(
+            temporal_intent.recency, Recency, "Recency should be Recency enum"
+        )
+        self.assertIsInstance(
+            temporal_intent.frequency, Frequency, "Frequency should be Frequency enum"
+        )
 
     def test_full_schema_validation(self):
         """Test that the complete intent structure is properly formed"""
         request = IntentExtractionRequest(
             product="search",
-            input={"text": "How to set up E2E encrypted email on Android, no big tech solutions"},
+            input={
+                "text": "How to set up E2E encrypted email on Android, no big tech solutions"
+            },
             context={"sessionId": "test_session", "userLocale": "en-US"},
         )
         response = extract_intent(request)
@@ -198,21 +245,37 @@ class TestIntentExtractor(unittest.TestCase):
         self.assertIsNotNone(intent.expiresAt, "Should have expiration time")
 
         # Check context fields
-        self.assertEqual(intent.context["product"], "search", "Should have correct product")
+        self.assertEqual(
+            intent.context["product"], "search", "Should have correct product"
+        )
         self.assertIn("sessionId", intent.context, "Should have session ID")
         self.assertIn("timestamp", intent.context, "Should have timestamp")
 
         # Check declared fields
         self.assertIsNotNone(intent.declared.query, "Should have query")
         self.assertIsNotNone(intent.declared.goal, "Should have goal")
-        self.assertIsInstance(intent.declared.constraints, list, "Should have constraints list")
-        self.assertIsInstance(intent.declared.negativePreferences, list, "Should have negative preferences list")
-        self.assertIsInstance(intent.declared.skillLevel, SkillLevel, "Should have skill level")
+        self.assertIsInstance(
+            intent.declared.constraints, list, "Should have constraints list"
+        )
+        self.assertIsInstance(
+            intent.declared.negativePreferences,
+            list,
+            "Should have negative preferences list",
+        )
+        self.assertIsInstance(
+            intent.declared.skillLevel, SkillLevel, "Should have skill level"
+        )
 
         # Check inferred fields
-        self.assertIsInstance(intent.inferred.useCases, list, "Should have use cases list")
-        self.assertIsNotNone(intent.inferred.temporalIntent, "Should have temporal intent")
-        self.assertIsInstance(intent.inferred.ethicalSignals, list, "Should have ethical signals list")
+        self.assertIsInstance(
+            intent.inferred.useCases, list, "Should have use cases list"
+        )
+        self.assertIsNotNone(
+            intent.inferred.temporalIntent, "Should have temporal intent"
+        )
+        self.assertIsInstance(
+            intent.inferred.ethicalSignals, list, "Should have ethical signals list"
+        )
         self.assertIsNotNone(intent.inferred.resultType, "Should have result type")
         self.assertIsNotNone(intent.inferred.complexity, "Should have complexity")
 
@@ -226,7 +289,11 @@ class TestIntentExtractor(unittest.TestCase):
         response = extract_intent(request)
         intent = response.intent
 
-        self.assertIn("no big tech", intent.declared.negativePreferences, "Should extract 'no big tech' preference")
+        self.assertIn(
+            "no big tech",
+            intent.declared.negativePreferences,
+            "Should extract 'no big tech' preference",
+        )
 
         request = IntentExtractionRequest(
             product="search",
@@ -237,7 +304,9 @@ class TestIntentExtractor(unittest.TestCase):
         intent = response.intent
 
         self.assertIn(
-            "no proprietary", intent.declared.negativePreferences, "Should extract 'no proprietary' preference"
+            "no proprietary",
+            intent.declared.negativePreferences,
+            "Should extract 'no proprietary' preference",
         )
 
     def test_response_metrics(self):
@@ -249,14 +318,28 @@ class TestIntentExtractor(unittest.TestCase):
         )
         response = extract_intent(request)
 
-        self.assertIsNotNone(response.extractionMetrics, "Should have extraction metrics")
-        self.assertIn("confidence", response.extractionMetrics, "Should have confidence metric")
-        self.assertIn("extractedDimensions", response.extractionMetrics, "Should have extracted dimensions")
-        self.assertIn("warnings", response.extractionMetrics, "Should have warnings field")
+        self.assertIsNotNone(
+            response.extractionMetrics, "Should have extraction metrics"
+        )
+        self.assertIn(
+            "confidence", response.extractionMetrics, "Should have confidence metric"
+        )
+        self.assertIn(
+            "extractedDimensions",
+            response.extractionMetrics,
+            "Should have extracted dimensions",
+        )
+        self.assertIn(
+            "warnings", response.extractionMetrics, "Should have warnings field"
+        )
 
         # Confidence should be between 0 and 1
-        self.assertGreaterEqual(response.extractionMetrics["confidence"], 0.0, "Confidence should be >= 0")
-        self.assertLessEqual(response.extractionMetrics["confidence"], 1.0, "Confidence should be <= 1")
+        self.assertGreaterEqual(
+            response.extractionMetrics["confidence"], 0.0, "Confidence should be >= 0"
+        )
+        self.assertLessEqual(
+            response.extractionMetrics["confidence"], 1.0, "Confidence should be <= 1"
+        )
 
 
 if __name__ == "__main__":

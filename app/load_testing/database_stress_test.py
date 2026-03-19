@@ -57,7 +57,9 @@ class DatabaseStressTest:
                 start = time.time()
                 try:
                     async with session.post(
-                        f"{self.base_url}/campaigns", json=payload, timeout=aiohttp.ClientTimeout(total=10)
+                        f"{self.base_url}/campaigns",
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=10),
                     ) as response:
                         elapsed = (time.time() - start) * 1000
                         if response.status == 200:
@@ -77,7 +79,8 @@ class DatabaseStressTest:
                 start = time.time()
                 try:
                     async with session.get(
-                        f"{self.base_url}/campaigns", timeout=aiohttp.ClientTimeout(total=10)
+                        f"{self.base_url}/campaigns",
+                        timeout=aiohttp.ClientTimeout(total=10),
                     ) as response:
                         elapsed = (time.time() - start) * 1000
                         if response.status == 200:
@@ -92,7 +95,11 @@ class DatabaseStressTest:
             # UPDATE operations (on first 10 created)
             print("  Running UPDATE operations...")
             for i, campaign_id in enumerate(created_ids[:10]):
-                payload = {"name": f"Updated Campaign {i}", "budget": 1500.0, "status": "paused"}
+                payload = {
+                    "name": f"Updated Campaign {i}",
+                    "budget": 1500.0,
+                    "status": "paused",
+                }
 
                 start = time.time()
                 try:
@@ -117,7 +124,8 @@ class DatabaseStressTest:
                 start = time.time()
                 try:
                     async with session.delete(
-                        f"{self.base_url}/campaigns/{campaign_id}", timeout=aiohttp.ClientTimeout(total=10)
+                        f"{self.base_url}/campaigns/{campaign_id}",
+                        timeout=aiohttp.ClientTimeout(total=10),
                     ) as response:
                         elapsed = (time.time() - start) * 1000
                         if response.status == 200:
@@ -133,14 +141,22 @@ class DatabaseStressTest:
         self._print_crud_results("Campaign CRUD", results)
         return results
 
-    async def test_concurrent_database_access(self, concurrency: int = 50, duration: int = 30):
+    async def test_concurrent_database_access(
+        self, concurrency: int = 50, duration: int = 30
+    ):
         """Test concurrent database read/write operations"""
         print(f"\n{'=' * 60}")
         print("Database Stress Test: Concurrent Database Access")
         print(f"Concurrency: {concurrency} | Duration: {duration}s")
         print(f"{'=' * 60}")
 
-        results = {"total_requests": 0, "successful": 0, "failed": 0, "response_times": [], "errors": []}
+        results = {
+            "total_requests": 0,
+            "successful": 0,
+            "failed": 0,
+            "response_times": [],
+            "errors": [],
+        }
 
         start_time = time.time()
 
@@ -149,7 +165,8 @@ class DatabaseStressTest:
                 # Mix of read operations only (ads endpoint may have validation issues)
                 # Focus on testing database connection pool, not API validation
                 async with session.get(
-                    f"{self.base_url}/campaigns", timeout=aiohttp.ClientTimeout(total=10)
+                    f"{self.base_url}/campaigns",
+                    timeout=aiohttp.ClientTimeout(total=10),
                 ) as response:
                     elapsed = (time.time() - start_time) * 1000
 
@@ -160,7 +177,9 @@ class DatabaseStressTest:
                         results["successful"] += 1
                     else:
                         results["failed"] += 1
-                        results["errors"].append(f"Request {request_id}: HTTP {response.status}")
+                        results["errors"].append(
+                            f"Request {request_id}: HTTP {response.status}"
+                        )
 
             except Exception as e:
                 results["total_requests"] += 1
@@ -177,7 +196,9 @@ class DatabaseStressTest:
                     tasks.append(task)
                     request_id += 1
 
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
                 tasks = list(pending)
 
             if tasks:
@@ -189,9 +210,13 @@ class DatabaseStressTest:
 
         if results["response_times"]:
             results["avg_response_time"] = statistics.mean(results["response_times"])
-            results["median_response_time"] = statistics.median(results["response_times"])
+            results["median_response_time"] = statistics.median(
+                results["response_times"]
+            )
             results["max_response_time"] = max(results["response_times"])
-            results["p95_response_time"] = sorted(results["response_times"])[int(len(results["response_times"]) * 0.95)]
+            results["p95_response_time"] = sorted(results["response_times"])[
+                int(len(results["response_times"]) * 0.95)
+            ]
 
         self._print_concurrent_results("Concurrent Database Access", results)
         return results
@@ -211,7 +236,8 @@ class DatabaseStressTest:
                 try:
                     # Rapid fire read operations
                     async with session.get(
-                        f"{self.base_url}/campaigns", timeout=aiohttp.ClientTimeout(total=5)
+                        f"{self.base_url}/campaigns",
+                        timeout=aiohttp.ClientTimeout(total=5),
                     ) as response:
                         elapsed = (time.time() - start) * 1000
                         results["total"] += 1
@@ -241,11 +267,17 @@ class DatabaseStressTest:
 
             # Check for connection exhaustion pattern
             # (increasing response times indicate connection pool issues)
-            first_quarter_avg = statistics.mean(results["times"][: len(results["times"]) // 4])
-            last_quarter_avg = statistics.mean(results["times"][-len(results["times"]) // 4 :])
+            first_quarter_avg = statistics.mean(
+                results["times"][: len(results["times"]) // 4]
+            )
+            last_quarter_avg = statistics.mean(
+                results["times"][-len(results["times"]) // 4 :]
+            )
 
             if last_quarter_avg > first_quarter_avg * 2:
-                print(f"\n  [WARN] Response times increased {last_quarter_avg / first_quarter_avg:.1f}x")
+                print(
+                    f"\n  [WARN] Response times increased {last_quarter_avg / first_quarter_avg:.1f}x"
+                )
                 print("  [WARN] Possible connection pool exhaustion detected!")
             else:
                 print("\n  [OK] Connection pool stable (no exhaustion detected)")
@@ -274,7 +306,9 @@ class DatabaseStressTest:
                 for i in range(10):
                     try:
                         async with session.post(
-                            f"{self.base_url}/campaigns", json=payload, timeout=aiohttp.ClientTimeout(total=5)
+                            f"{self.base_url}/campaigns",
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=5),
                         ) as response:
                             results["invalid_requests"] += 1
                             if response.status in [400, 422]:
@@ -321,7 +355,9 @@ class DatabaseStressTest:
         print(f"  Total requests: {results['total_requests']}")
         print(f"  Successful: {results['successful']}")
         print(f"  Failed: {results['failed']}")
-        print(f"  Success rate: {(results['successful'] / results['total_requests'] * 100):.1f}%")
+        print(
+            f"  Success rate: {(results['successful'] / results['total_requests'] * 100):.1f}%"
+        )
         print(f"  Duration: {results['duration']:.2f}s")
         print(f"  RPS: {results['rps']:.2f}")
 

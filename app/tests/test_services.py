@@ -5,13 +5,25 @@ Unit tests for the service_recommender module
 import copy
 import unittest
 
-from app.core.schema import (DeclaredIntent, EthicalDimension, EthicalSignal,
-                         Frequency, InferredIntent, IntentGoal, Recency,
-                         SkillLevel, TemporalHorizon, TemporalIntent,
-                         UniversalIntent, UseCase)
-from app.services.recommender import (ServiceMetadata,
-                                  ServiceRecommendationRequest,
-                                  recommend_services)
+from app.core.schema import (
+    DeclaredIntent,
+    EthicalDimension,
+    EthicalSignal,
+    Frequency,
+    InferredIntent,
+    IntentGoal,
+    Recency,
+    SkillLevel,
+    TemporalHorizon,
+    TemporalIntent,
+    UniversalIntent,
+    UseCase,
+)
+from app.services.recommender import (
+    ServiceMetadata,
+    ServiceRecommendationRequest,
+    recommend_services,
+)
 
 
 class TestServiceRecommender(unittest.TestCase):
@@ -34,9 +46,15 @@ class TestServiceRecommender(unittest.TestCase):
             inferred=InferredIntent(
                 useCases=[UseCase.PROFESSIONAL_DEVELOPMENT, UseCase.LEARNING],
                 temporalIntent=TemporalIntent(
-                    horizon=TemporalHorizon.WEEK, recency=Recency.EVERGREEN, frequency=Frequency.RECURRING
+                    horizon=TemporalHorizon.WEEK,
+                    recency=Recency.EVERGREEN,
+                    frequency=Frequency.RECURRING,
                 ),
-                ethicalSignals=[EthicalSignal(dimension=EthicalDimension.OPENNESS, preference="open_format")],
+                ethicalSignals=[
+                    EthicalSignal(
+                        dimension=EthicalDimension.OPENNESS, preference="open_format"
+                    )
+                ],
             ),
         )
         # Deep copy for each test to prevent mutation issues
@@ -88,7 +106,9 @@ class TestServiceRecommender(unittest.TestCase):
         intent = self.learning_intent
         intent.declared.goal = IntentGoal.CREATE
 
-        request = ServiceRecommendationRequest(intent=intent, availableServices=self.test_services)
+        request = ServiceRecommendationRequest(
+            intent=intent, availableServices=self.test_services
+        )
 
         response = recommend_services(request)
 
@@ -98,10 +118,15 @@ class TestServiceRecommender(unittest.TestCase):
         self.assertEqual(top_recommendation.service.id, "docs")
         # Check if goal is matched (either directly or semantically)
         goal_matched = any(
-            "goal=" in reason and "supported" in reason or "goal-semantically-matched" in reason
+            "goal=" in reason
+            and "supported" in reason
+            or "goal-semantically-matched" in reason
             for reason in top_recommendation.matchReasons
         )
-        self.assertTrue(goal_matched, f"Goal should be matched in reasons: {top_recommendation.matchReasons}")
+        self.assertTrue(
+            goal_matched,
+            f"Goal should be matched in reasons: {top_recommendation.matchReasons}",
+        )
 
     def test_goal_based_routing_learn_to_search(self):
         """Test that LEARN goal routes to search service"""
@@ -122,12 +147,16 @@ class TestServiceRecommender(unittest.TestCase):
             inferred=InferredIntent(
                 useCases=[UseCase.LEARNING],
                 temporalIntent=TemporalIntent(
-                    horizon=TemporalHorizon.LONGTERM, recency=Recency.EVERGREEN, frequency=Frequency.EXPLORATORY
+                    horizon=TemporalHorizon.LONGTERM,
+                    recency=Recency.EVERGREEN,
+                    frequency=Frequency.EXPLORATORY,
                 ),
             ),
         )
 
-        request = ServiceRecommendationRequest(intent=learn_intent, availableServices=self.test_services)
+        request = ServiceRecommendationRequest(
+            intent=learn_intent, availableServices=self.test_services
+        )
 
         response = recommend_services(request)
 
@@ -140,14 +169,18 @@ class TestServiceRecommender(unittest.TestCase):
             if rec.service.id == "search":
                 search_ranked = True
                 break
-        self.assertTrue(search_ranked, "Search service should be recommended for LEARN goal")
+        self.assertTrue(
+            search_ranked, "Search service should be recommended for LEARN goal"
+        )
 
     def test_semantic_use_case_matching(self):
         """Test semantic use case matching"""
         # Intent with research use case
         intent = self.learning_intent
 
-        request = ServiceRecommendationRequest(intent=intent, availableServices=self.test_services)
+        request = ServiceRecommendationRequest(
+            intent=intent, availableServices=self.test_services
+        )
 
         response = recommend_services(request)
 
@@ -159,7 +192,11 @@ class TestServiceRecommender(unittest.TestCase):
                 break
 
         self.assertIsNotNone(docs_rec, "Docs service should be recommended")
-        self.assertGreater(docs_rec.serviceScore, 0.5, "Docs should have high score for research use case")
+        self.assertGreater(
+            docs_rec.serviceScore,
+            0.5,
+            "Docs should have high score for research use case",
+        )
 
         # Check that one of the use cases was matched
         use_case_matched = any("use case" in reason for reason in docs_rec.matchReasons)
@@ -170,7 +207,9 @@ class TestServiceRecommender(unittest.TestCase):
         # Intent with openness ethical signal
         intent = self.learning_intent
 
-        request = ServiceRecommendationRequest(intent=intent, availableServices=self.test_services)
+        request = ServiceRecommendationRequest(
+            intent=intent, availableServices=self.test_services
+        )
 
         response = recommend_services(request)
 
@@ -184,7 +223,9 @@ class TestServiceRecommender(unittest.TestCase):
         self.assertIsNotNone(docs_rec, "Docs service should be recommended")
 
         # Check for ethical alignment
-        ethical_matched = any("open_format" in reason for reason in docs_rec.matchReasons)
+        ethical_matched = any(
+            "open_format" in reason for reason in docs_rec.matchReasons
+        )
         self.assertTrue(ethical_matched, "Ethical alignment should be considered")
 
     def test_no_match_scenario(self):
@@ -204,14 +245,20 @@ class TestServiceRecommender(unittest.TestCase):
                 skillLevel=SkillLevel.BEGINNER,
             ),
             inferred=InferredIntent(
-                useCases=[UseCase.ENTERTAINMENT],  # Use a valid use case that might not match services well
+                useCases=[
+                    UseCase.ENTERTAINMENT
+                ],  # Use a valid use case that might not match services well
                 temporalIntent=TemporalIntent(
-                    horizon=TemporalHorizon.TODAY, recency=Recency.RECENT, frequency=Frequency.ONEOFF
+                    horizon=TemporalHorizon.TODAY,
+                    recency=Recency.RECENT,
+                    frequency=Frequency.ONEOFF,
                 ),
             ),
         )
 
-        request = ServiceRecommendationRequest(intent=unmatched_intent, availableServices=self.test_services)
+        request = ServiceRecommendationRequest(
+            intent=unmatched_intent, availableServices=self.test_services
+        )
 
         response = recommend_services(request)
 
@@ -234,17 +281,23 @@ class TestServiceRecommender(unittest.TestCase):
                 "userLocale": "en-US",
             },
             declared=DeclaredIntent(
-                query="Organize my work", goal=IntentGoal.ORGANIZE, skillLevel=SkillLevel.INTERMEDIATE
+                query="Organize my work",
+                goal=IntentGoal.ORGANIZE,
+                skillLevel=SkillLevel.INTERMEDIATE,
             ),
             inferred=InferredIntent(
                 useCases=[UseCase.PROFESSIONAL_DEVELOPMENT],
                 temporalIntent=TemporalIntent(
-                    horizon=TemporalHorizon.FLEXIBLE, recency=Recency.EVERGREEN, frequency=Frequency.FLEXIBLE
+                    horizon=TemporalHorizon.FLEXIBLE,
+                    recency=Recency.EVERGREEN,
+                    frequency=Frequency.FLEXIBLE,
                 ),
             ),
         )
 
-        request = ServiceRecommendationRequest(intent=generic_intent, availableServices=self.test_services)
+        request = ServiceRecommendationRequest(
+            intent=generic_intent, availableServices=self.test_services
+        )
 
         response = recommend_services(request)
 
@@ -253,10 +306,15 @@ class TestServiceRecommender(unittest.TestCase):
 
         # Check that services supporting ORGANIZE goal are prioritized
         mail_found = any(rec.service.id == "mail" for rec in response.recommendations)
-        calendar_found = any(rec.service.id == "calendar" for rec in response.recommendations)
+        calendar_found = any(
+            rec.service.id == "calendar" for rec in response.recommendations
+        )
 
         # Both mail and calendar support ORGANIZE, so they should be in results
-        self.assertTrue(mail_found or calendar_found, "Services supporting ORGANIZE should be recommended")
+        self.assertTrue(
+            mail_found or calendar_found,
+            "Services supporting ORGANIZE should be recommended",
+        )
 
     def test_temporal_pattern_matching(self):
         """Test temporal pattern matching"""
@@ -270,17 +328,23 @@ class TestServiceRecommender(unittest.TestCase):
                 "userLocale": "en-US",
             },
             declared=DeclaredIntent(
-                query="Track weekly progress", goal=IntentGoal.ORGANIZE, skillLevel=SkillLevel.INTERMEDIATE
+                query="Track weekly progress",
+                goal=IntentGoal.ORGANIZE,
+                skillLevel=SkillLevel.INTERMEDIATE,
             ),
             inferred=InferredIntent(
                 useCases=[UseCase.PROFESSIONAL_DEVELOPMENT],
                 temporalIntent=TemporalIntent(
-                    horizon=TemporalHorizon.WEEK, recency=Recency.EVERGREEN, frequency=Frequency.RECURRING
+                    horizon=TemporalHorizon.WEEK,
+                    recency=Recency.EVERGREEN,
+                    frequency=Frequency.RECURRING,
                 ),
             ),
         )
 
-        request = ServiceRecommendationRequest(intent=intent_with_temporal, availableServices=self.test_services)
+        request = ServiceRecommendationRequest(
+            intent=intent_with_temporal, availableServices=self.test_services
+        )
 
         response = recommend_services(request)
 

@@ -30,7 +30,9 @@ class SeedURLInjector:
     async def connect(self):
         """Connect to Redis."""
         if not self.redis_client:
-            self.redis_client = redis.from_url(self.redis_url, encoding="utf-8", decode_responses=True)
+            self.redis_client = redis.from_url(
+                self.redis_url, encoding="utf-8", decode_responses=True
+            )
             logger.info(f"Connected to Redis: {self.redis_url}")
 
     async def close(self):
@@ -39,7 +41,9 @@ class SeedURLInjector:
             await self.redis_client.close()
             logger.info("Redis connection closed")
 
-    async def inject_seed_urls(self, urls: list[dict], priority: int = 5, max_depth: int = 2) -> int:
+    async def inject_seed_urls(
+        self, urls: list[dict], priority: int = 5, max_depth: int = 2
+    ) -> int:
         """
         Inject seed URLs into the crawler's Redis queue.
 
@@ -88,7 +92,9 @@ class SeedURLInjector:
 
                 # Add to Redis sorted set (priority queue)
                 # Score = priority (higher priority = processed first)
-                await self.redis_client.zadd(queue_key, {json.dumps(queue_item): float(priority)})
+                await self.redis_client.zadd(
+                    queue_key, {json.dumps(queue_item): float(priority)}
+                )
 
                 injected += 1
                 logger.debug(f"Injected seed URL: {url} (priority={priority})")
@@ -100,7 +106,9 @@ class SeedURLInjector:
         logger.info(f"Successfully injected {injected}/{len(urls)} seed URLs")
         return injected
 
-    async def inject_raw_urls(self, urls: list[str], priority: int = 5, max_depth: int = 2) -> int:
+    async def inject_raw_urls(
+        self, urls: list[str], priority: int = 5, max_depth: int = 2
+    ) -> int:
         """
         Inject raw URL strings into the crawler queue.
 
@@ -139,7 +147,11 @@ class SeedURLInjector:
         queue_size = await self.redis_client.zcard(queue_key)
         visited_count = await self.redis_client.scard(visited_key)
 
-        return {"queue_size": queue_size, "visited_count": visited_count, "timestamp": datetime.utcnow().isoformat()}
+        return {
+            "queue_size": queue_size,
+            "visited_count": visited_count,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
 
 
 async def inject_discovered_urls():
@@ -160,7 +172,9 @@ async def inject_discovered_urls():
 
     # Discover URLs for Go language
     logger.info("Discovering Go language URLs...")
-    go_urls = await discovery.discover_multiple_topics(topics=DISCOVERY_TOPICS["go_language"], urls_per_topic=10)
+    go_urls = await discovery.discover_multiple_topics(
+        topics=DISCOVERY_TOPICS["go_language"], urls_per_topic=10
+    )
 
     if go_urls:
         injected = await injector.inject_seed_urls(go_urls, priority=8)
@@ -168,7 +182,9 @@ async def inject_discovered_urls():
 
     # Discover URLs for general programming
     logger.info("Discovering programming URLs...")
-    prog_urls = await discovery.discover_multiple_topics(topics=DISCOVERY_TOPICS["programming"], urls_per_topic=5)
+    prog_urls = await discovery.discover_multiple_topics(
+        topics=DISCOVERY_TOPICS["programming"], urls_per_topic=5
+    )
 
     if prog_urls:
         injected = await injector.inject_seed_urls(prog_urls, priority=6)

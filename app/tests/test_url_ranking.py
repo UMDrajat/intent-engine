@@ -5,11 +5,22 @@ Unit tests for the URL ranking module
 import asyncio
 import unittest
 
-from app.core.schema import (Constraint, ConstraintType, DeclaredIntent,
-                         EthicalDimension, EthicalSignal, InferredIntent,
-                         UniversalIntent)
-from app.ranking.url_ranker import (PrivacyDatabase, URLAnalyzer, URLRanker,
-                                URLRankingRequest, URLResult)
+from app.core.schema import (
+    Constraint,
+    ConstraintType,
+    DeclaredIntent,
+    EthicalDimension,
+    EthicalSignal,
+    InferredIntent,
+    UniversalIntent,
+)
+from app.ranking.url_ranker import (
+    PrivacyDatabase,
+    URLAnalyzer,
+    URLRanker,
+    URLRankingRequest,
+    URLResult,
+)
 
 
 class TestPrivacyDatabase(unittest.TestCase):
@@ -151,7 +162,9 @@ class TestURLRanker(unittest.TestCase):
 
         # At least some privacy domains should be in top 5
         privacy_domains_in_top = sum(
-            1 for d in top_5_domains if d in ["protonmail.com", "tutanota.com", "duckduckgo.com", "searx.org"]
+            1
+            for d in top_5_domains
+            if d in ["protonmail.com", "tutanota.com", "duckduckgo.com", "searx.org"]
         )
         self.assertGreater(privacy_domains_in_top, 0)
 
@@ -167,7 +180,9 @@ class TestURLRanker(unittest.TestCase):
             "https://tutanota.com",
         ]
 
-        request = URLRankingRequest(query="email service", urls=urls, options={"exclude_big_tech": True})
+        request = URLRankingRequest(
+            query="email service", urls=urls, options={"exclude_big_tech": True}
+        )
 
         response = asyncio.run(self.ranker.rank_urls(request))
 
@@ -184,7 +199,9 @@ class TestURLRanker(unittest.TestCase):
             "https://google.com",
         ]
 
-        request = URLRankingRequest(query="privacy", urls=urls, options={"min_privacy_score": 0.8})
+        request = URLRankingRequest(
+            query="privacy", urls=urls, options={"min_privacy_score": 0.8}
+        )
 
         response = asyncio.run(self.ranker.rank_urls(request))
 
@@ -200,7 +217,12 @@ class TestURLRanker(unittest.TestCase):
             declared=DeclaredIntent(
                 query="code repository",
                 constraints=[
-                    Constraint(type=ConstraintType.INCLUSION, dimension="domain", value="github.com", hardFilter=True)
+                    Constraint(
+                        type=ConstraintType.INCLUSION,
+                        dimension="domain",
+                        value="github.com",
+                        hardFilter=True,
+                    )
                 ],
             ),
             inferred=InferredIntent(),
@@ -228,7 +250,12 @@ class TestURLRanker(unittest.TestCase):
             declared=DeclaredIntent(
                 query="search engine",
                 constraints=[
-                    Constraint(type=ConstraintType.EXCLUSION, dimension="domain", value="google.com", hardFilter=True)
+                    Constraint(
+                        type=ConstraintType.EXCLUSION,
+                        dimension="domain",
+                        value="google.com",
+                        hardFilter=True,
+                    )
                 ],
             ),
             inferred=InferredIntent(),
@@ -257,8 +284,13 @@ class TestURLRanker(unittest.TestCase):
             declared=DeclaredIntent(query="open source software"),
             inferred=InferredIntent(
                 ethicalSignals=[
-                    EthicalSignal(dimension=EthicalDimension.OPENNESS, preference="open-source_preferred"),
-                    EthicalSignal(dimension=EthicalDimension.PRIVACY, preference="privacy-first"),
+                    EthicalSignal(
+                        dimension=EthicalDimension.OPENNESS,
+                        preference="open-source_preferred",
+                    ),
+                    EthicalSignal(
+                        dimension=EthicalDimension.PRIVACY, preference="privacy-first"
+                    ),
                 ]
             ),
         )
@@ -269,7 +301,9 @@ class TestURLRanker(unittest.TestCase):
             "https://medium.com",
         ]
 
-        request = URLRankingRequest(query="open source software", urls=urls, intent=intent)
+        request = URLRankingRequest(
+            query="open source software", urls=urls, intent=intent
+        )
 
         response = asyncio.run(self.ranker.rank_urls(request))
 
@@ -285,7 +319,14 @@ class TestURLRanker(unittest.TestCase):
         request = URLRankingRequest(
             query="email",
             urls=urls,
-            options={"weights": {"relevance": 0.1, "privacy": 0.6, "quality": 0.15, "ethics": 0.15}},
+            options={
+                "weights": {
+                    "relevance": 0.1,
+                    "privacy": 0.6,
+                    "quality": 0.15,
+                    "ethics": 0.15,
+                }
+            },
         )
 
         response = asyncio.run(self.ranker.rank_urls(request))
@@ -304,7 +345,9 @@ class TestURLRanker(unittest.TestCase):
 
     def test_single_url(self):
         """Test with single URL"""
-        request = URLRankingRequest(query="privacy email", urls=["https://protonmail.com"])
+        request = URLRankingRequest(
+            query="privacy email", urls=["https://protonmail.com"]
+        )
 
         response = asyncio.run(self.ranker.rank_urls(request))
 
@@ -346,7 +389,9 @@ class TestURLRanker(unittest.TestCase):
         intent = UniversalIntent(
             intentId="test-123",
             context={"product": "search"},
-            declared=DeclaredIntent(query="search", negativePreferences=["no google", "no facebook"]),
+            declared=DeclaredIntent(
+                query="search", negativePreferences=["no google", "no facebook"]
+            ),
             inferred=InferredIntent(),
         )
 

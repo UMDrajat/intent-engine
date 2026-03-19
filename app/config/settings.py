@@ -6,7 +6,7 @@ with validation, type safety, and environment variable management.
 
 Usage:
     from app.config.settings import settings
-    
+
     # Access settings
     db_url = settings.database.effective_url
     secret_key = settings.security.secret_key
@@ -15,7 +15,6 @@ Usage:
     settings.validate_production()
 """
 
-import secrets
 import os
 from functools import lru_cache
 from typing import Literal
@@ -29,7 +28,9 @@ class DatabaseSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="DATABASE_",
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         extra="ignore",
     )
 
@@ -89,7 +90,12 @@ class DatabaseSettings(BaseSettings):
         """Validate password strength in production."""
         env = os.getenv("ENVIRONMENT", "development")
         if env == "production":
-            if v in ("change_this_password_in_production", "password", "admin", "intent_secure_password_change_in_prod"):
+            if v in (
+                "change_this_password_in_production",
+                "password",
+                "admin",
+                "intent_secure_password_change_in_prod",
+            ):
                 raise ValueError(
                     "Weak database password detected. "
                     "Please use a strong, unique password in production."
@@ -106,7 +112,9 @@ class RedisSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="REDIS_",
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         extra="ignore",
     )
 
@@ -157,7 +165,9 @@ class SecuritySettings(BaseSettings):
     """Security configuration settings."""
 
     model_config = SettingsConfigDict(
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         extra="ignore",
     )
 
@@ -244,7 +254,9 @@ class SearXNGSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="SEARXNG_",
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         extra="ignore",
     )
 
@@ -280,7 +292,9 @@ class MLSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="",
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         extra="ignore",
     )
 
@@ -306,7 +320,9 @@ class PrivacySettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="",
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         extra="ignore",
     )
 
@@ -354,7 +370,9 @@ class MonitoringSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="",
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         extra="ignore",
     )
 
@@ -379,7 +397,9 @@ class MonitoringSettings(BaseSettings):
     )
 
     # Distributed tracing
-    tracing_enabled: bool = Field(default=False, description="Enable distributed tracing")
+    tracing_enabled: bool = Field(
+        default=False, description="Enable distributed tracing"
+    )
     tracing_endpoint: str = Field(
         default="http://localhost:4317", description="Tracing endpoint"
     )
@@ -393,7 +413,9 @@ class ApplicationSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="",
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         extra="ignore",
     )
 
@@ -464,7 +486,9 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         env_nested_delimiter="_",
         extra="ignore",
     )

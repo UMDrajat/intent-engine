@@ -402,7 +402,9 @@ class WebIntentExtractor:
         """
         # Common price patterns
         # 1. Symbol first: $99.99, £99, ₹1,500
-        pattern1 = re.compile(r"(\$|£|€|₹|Rs\.?\s?)\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)")
+        pattern1 = re.compile(
+            r"(\$|£|€|₹|Rs\.?\s?)\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)"
+        )
         # 2. Symbol last: 99.99 €, 99€
         pattern2 = re.compile(r"(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\s?(\$|£|€|₹)")
 
@@ -476,7 +478,9 @@ class WebIntentExtractor:
         sentence_count = len(re.findall(r"[.!?]+", content))
 
         # Average sentence length
-        avg_sentence_length = word_count / sentence_count if sentence_count > 0 else word_count
+        avg_sentence_length = (
+            word_count / sentence_count if sentence_count > 0 else word_count
+        )
 
         # Simple heuristics
         if word_count < 500 or avg_sentence_length < 10:
@@ -523,7 +527,9 @@ class WebIntentExtractor:
         # Return top 5 topics
         return [topic for topic, _ in sorted_topics[:5]]
 
-    def _calculate_confidence(self, goal: IntentGoal, use_cases: list[UseCase], topics: list[str]) -> float:
+    def _calculate_confidence(
+        self, goal: IntentGoal, use_cases: list[UseCase], topics: list[str]
+    ) -> float:
         """Calculate extraction confidence score"""
         base_confidence = 0.5
 

@@ -80,7 +80,9 @@ class HybridQueryCache:
         self.default_ttl_seconds = default_ttl_seconds
         self.redis_ttl_seconds = redis_ttl_seconds or default_ttl_seconds
         self.name = name
-        self.use_redis = use_redis and os.getenv("REDIS_ENABLED", "false").lower() == "true"
+        self.use_redis = (
+            use_redis and os.getenv("REDIS_ENABLED", "false").lower() == "true"
+        )
 
         # L1: Local cache
         self.cache: dict[str, CacheEntry] = {}
@@ -91,7 +93,9 @@ class HybridQueryCache:
         if self.use_redis:
             self.redis_cache = redis_cache_instance
             if self.redis_cache is None:
-                logger.warning(f"Redis not available for cache '{name}', using local cache only")
+                logger.warning(
+                    f"Redis not available for cache '{name}', using local cache only"
+                )
                 self.use_redis = False
 
         # Stats
@@ -122,7 +126,9 @@ class HybridQueryCache:
     def _cleanup_expired(self) -> int:
         """Remove expired entries from local cache"""
         with self.lock:
-            expired_keys = [key for key, entry in self.cache.items() if entry.is_expired()]
+            expired_keys = [
+                key for key, entry in self.cache.items() if entry.is_expired()
+            ]
             for key in expired_keys:
                 del self.cache[key]
             self.stats["expirations"] += len(expired_keys)
@@ -262,9 +268,15 @@ class HybridQueryCache:
     def get_stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         with self.lock:
-            total_requests = self.stats["hits_l1"] + self.stats["hits_l2"] + self.stats["misses"]
-            hit_rate_l1 = self.stats["hits_l1"] / total_requests if total_requests > 0 else 0
-            hit_rate_l2 = self.stats["hits_l2"] / total_requests if total_requests > 0 else 0
+            total_requests = (
+                self.stats["hits_l1"] + self.stats["hits_l2"] + self.stats["misses"]
+            )
+            hit_rate_l1 = (
+                self.stats["hits_l1"] / total_requests if total_requests > 0 else 0
+            )
+            hit_rate_l2 = (
+                self.stats["hits_l2"] / total_requests if total_requests > 0 else 0
+            )
 
             stats = {
                 "name": self.name,

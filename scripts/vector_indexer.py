@@ -30,7 +30,9 @@ class VectorDocument:
 class QdrantClient:
     """Simple Qdrant client for vector operations"""
 
-    def __init__(self, host: str = "qdrant", port: int = 6333, collection: str = "intent_vectors"):
+    def __init__(
+        self, host: str = "qdrant", port: int = 6333, collection: str = "intent_vectors"
+    ):
         self.host = host
         self.port = port
         self.base_url = f"http://{host}:{port}"
@@ -65,7 +67,11 @@ class QdrantClient:
         }
 
         try:
-            resp = requests.put(f"{self.base_url}/collections/{self.collection}", json=config, timeout=30)
+            resp = requests.put(
+                f"{self.base_url}/collections/{self.collection}",
+                json=config,
+                timeout=30,
+            )
             if resp.status_code == 200:
                 logger.info(f"Created collection {self.collection}")
                 return True
@@ -100,7 +106,9 @@ class QdrantClient:
 
         try:
             resp = requests.put(
-                f"{self.base_url}/collections/{self.collection}/points", json={"points": points}, timeout=30
+                f"{self.base_url}/collections/{self.collection}/points",
+                json={"points": points},
+                timeout=30,
             )
             if resp.status_code == 200:
                 logger.info(f"Upserted {len(documents)} documents")
@@ -114,10 +122,19 @@ class QdrantClient:
 
     def search(self, query_vector: list[float], limit: int = 10) -> list[dict]:
         """Search for similar documents"""
-        query = {"vector": query_vector, "limit": limit, "with_payload": True, "with_vector": False}
+        query = {
+            "vector": query_vector,
+            "limit": limit,
+            "with_payload": True,
+            "with_vector": False,
+        }
 
         try:
-            resp = requests.post(f"{self.base_url}/collections/{self.collection}/points/search", json=query, timeout=10)
+            resp = requests.post(
+                f"{self.base_url}/collections/{self.collection}/points/search",
+                json=query,
+                timeout=10,
+            )
             if resp.status_code == 200:
                 results = resp.json().get("result", [])
                 logger.info(f"Found {len(results)} results")

@@ -317,7 +317,10 @@ class ProgrammingLanguageDetector:
         self.compiled_patterns = {}
         for lang, patterns in self.language_patterns.items():
             self.compiled_patterns[lang] = {
-                "keywords": [re.compile(p, re.IGNORECASE | re.MULTILINE) for p in patterns["keywords"]],
+                "keywords": [
+                    re.compile(p, re.IGNORECASE | re.MULTILINE)
+                    for p in patterns["keywords"]
+                ],
                 "error_prefixes": patterns.get("error_prefixes", []),
                 "file_extensions": patterns.get("file_extensions", []),
             }
@@ -461,7 +464,9 @@ class ErrorMessageParser:
         # Compile patterns
         self.compiled_patterns = {}
         for error_type, patterns in self.error_patterns.items():
-            self.compiled_patterns[error_type] = [re.compile(p, re.IGNORECASE) for p in patterns]
+            self.compiled_patterns[error_type] = [
+                re.compile(p, re.IGNORECASE) for p in patterns
+            ]
 
         # Error code patterns
         self.error_code_patterns = [
@@ -596,13 +601,17 @@ class CodeSnippetDetector:
         for match in re.finditer(self.code_patterns[1], text):
             # Check if this inline match is inside any block match
             start, end = match.span()
-            is_inside_block = any(b_start <= start and end <= b_end for b_start, b_end in block_ranges)
+            is_inside_block = any(
+                b_start <= start and end <= b_end for b_start, b_end in block_ranges
+            )
 
             if not is_inside_block:
                 code = match.group(1).strip()
                 # Only add if it looks like code (has programming characters)
                 if re.search(r"[\(\)\{\}\[\];=]", code):
-                    snippets.append({"language": "unknown", "code": code, "type": "inline"})
+                    snippets.append(
+                        {"language": "unknown", "code": code, "type": "inline"}
+                    )
 
         return snippets
 
@@ -620,7 +629,14 @@ class ProgrammingIntentExtractor:
 
         # Framework-specific patterns
         self.framework_patterns = {
-            "React": [r"\bReact\b", r"\buseState\b", r"\beffect\b", r"\bJSX\b", r"render\s*\(", r"\bComponent\b"],
+            "React": [
+                r"\bReact\b",
+                r"\buseState\b",
+                r"\beffect\b",
+                r"\bJSX\b",
+                r"render\s*\(",
+                r"\bComponent\b",
+            ],
             "Django": [
                 r"\bDjango\b",
                 r"\bmodels\.Model\b",
@@ -629,17 +645,66 @@ class ProgrammingIntentExtractor:
                 r"\bmanage\.py\b",
                 r"\{\{\s*[\w.]+\s*\}\}",
             ],
-            "FastAPI": [r"\bFastAPI\b", r"@app\.\w+\s*\(", r"Pydantic", r"uvicorn", r"async\s+def\b"],
-            "Flask": [r"\bFlask\b", r"@app\.route\b", r"render_template", r"flask\s+run"],
-            "Spring Boot": [r"@SpringBootApplication", r"@RestController", r"@Autowired", r"Spring\s*Boot"],
-            "Express": [r"\bExpress\b", r"app\.get\s*\(", r"app\.use\s*\(", r"req,\s*res", r"middleware"],
-            "Rails": [r"\bRails\b", r"ActiveRecord", r"ActionController", r"ActiveStorage", r"rails\s+server"],
-            "Angular": [r"\b@Component\b", r"\[\w+\]\s*=", r"\(\w+\)\s*=", r"ngIf", r"ngFor", r"\bAngular\b"],
-            "Flutter": [r"\bFlutter\b", r"\bWidget\b", r"\bStatelessWidget\b", r"\bStatefulWidget\b", r"setState\s*\("],
-            "Vue": [r"\bVue\b", r"v-if", r"v-for", r"v-bind", r"v-model", r"computed\s*:"],
+            "FastAPI": [
+                r"\bFastAPI\b",
+                r"@app\.\w+\s*\(",
+                r"Pydantic",
+                r"uvicorn",
+                r"async\s+def\b",
+            ],
+            "Flask": [
+                r"\bFlask\b",
+                r"@app\.route\b",
+                r"render_template",
+                r"flask\s+run",
+            ],
+            "Spring Boot": [
+                r"@SpringBootApplication",
+                r"@RestController",
+                r"@Autowired",
+                r"Spring\s*Boot",
+            ],
+            "Express": [
+                r"\bExpress\b",
+                r"app\.get\s*\(",
+                r"app\.use\s*\(",
+                r"req,\s*res",
+                r"middleware",
+            ],
+            "Rails": [
+                r"\bRails\b",
+                r"ActiveRecord",
+                r"ActionController",
+                r"ActiveStorage",
+                r"rails\s+server",
+            ],
+            "Angular": [
+                r"\b@Component\b",
+                r"\[\w+\]\s*=",
+                r"\(\w+\)\s*=",
+                r"ngIf",
+                r"ngFor",
+                r"\bAngular\b",
+            ],
+            "Flutter": [
+                r"\bFlutter\b",
+                r"\bWidget\b",
+                r"\bStatelessWidget\b",
+                r"\bStatefulWidget\b",
+                r"setState\s*\(",
+            ],
+            "Vue": [
+                r"\bVue\b",
+                r"v-if",
+                r"v-for",
+                r"v-bind",
+                r"v-model",
+                r"computed\s*:",
+            ],
         }
         self.compiled_frameworks = {
-            name: [re.compile(p, re.IGNORECASE) for p in patterns] for name, patterns in self.framework_patterns.items()
+            name: [re.compile(p, re.IGNORECASE) for p in patterns]
+            for name, patterns in self.framework_patterns.items()
         }
 
         # Programming-specific keywords
@@ -655,7 +720,9 @@ class ProgrammingIntentExtractor:
         ]
 
         # Compile patterns
-        self.compiled_keywords = [re.compile(p, re.IGNORECASE) for p in self.programming_keywords]
+        self.compiled_keywords = [
+            re.compile(p, re.IGNORECASE) for p in self.programming_keywords
+        ]
 
     def is_programming_query(self, text: str) -> tuple[bool, float]:
         """
@@ -676,7 +743,9 @@ class ProgrammingIntentExtractor:
             return True, error_analysis["confidence"]
 
         # Check for programming keywords
-        keyword_matches = sum(1 for pattern in self.compiled_keywords if pattern.search(text))
+        keyword_matches = sum(
+            1 for pattern in self.compiled_keywords if pattern.search(text)
+        )
 
         # Check for programming language
         lang, lang_confidence = self.language_detector.detect_language(text)
@@ -763,20 +832,28 @@ class ProgrammingIntentExtractor:
 
         # Check for error/exception keywords
         if re.search(
-            r"\b(error|exception|bug|not working|broken|fix)\b|\w+(Error|Exception)\b", text_lower, re.IGNORECASE
+            r"\b(error|exception|bug|not working|broken|fix)\b|\w+(Error|Exception)\b",
+            text_lower,
+            re.IGNORECASE,
         ):
             return IntentGoal.PROGRAMMING_ERROR
 
         # Check for debugging keywords
-        if re.search(r"\b(debug|debugging|trace|breakpoint|step through)\b", text_lower):
+        if re.search(
+            r"\b(debug|debugging|trace|breakpoint|step through)\b", text_lower
+        ):
             return IntentGoal.CODE_DEBUG
 
         # Check for code review keywords
-        if re.search(r"\b(review|optimize|refactor|improve|best practice)\b", text_lower):
+        if re.search(
+            r"\b(review|optimize|refactor|improve|best practice)\b", text_lower
+        ):
             return IntentGoal.CODE_REVIEW
 
         # Check for API integration keywords
-        if re.search(r"\b(api|integration|connect|endpoint|rest|graphql)\b", text_lower):
+        if re.search(
+            r"\b(api|integration|connect|endpoint|rest|graphql)\b", text_lower
+        ):
             return IntentGoal.API_INTEGRATION
 
         # Default to troubleshooting for programming queries
@@ -804,7 +881,11 @@ class ProgrammingIntentExtractor:
         Generate optimized search queries based on programming context.
         """
         queries = []
-        lang = context.language.value if hasattr(context.language, "value") else str(context.language)
+        lang = (
+            context.language.value
+            if hasattr(context.language, "value")
+            else str(context.language)
+        )
 
         if lang == "unknown":
             lang = ""
@@ -815,7 +896,11 @@ class ProgrammingIntentExtractor:
 
         # Query 2: Language + Error Type + Error Message
         if context.errorType != ErrorType.UNKNOWN:
-            error_type = context.errorType.value if hasattr(context.errorType, "value") else str(context.errorType)
+            error_type = (
+                context.errorType.value
+                if hasattr(context.errorType, "value")
+                else str(context.errorType)
+            )
             queries.append(f"{lang} {error_type} {context.errorMessage}".strip())
 
         # Query 3: Framework + Error Message

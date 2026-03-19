@@ -184,7 +184,9 @@ class Constraint:
 
     type: ConstraintType
     dimension: str  # 'language', 'region', 'price', 'license', 'format', 'recency'
-    value: str | int | float | list[str | int | float] | list[int]  # Single value, range, or list
+    value: (
+        str | int | float | list[str | int | float] | list[int]
+    )  # Single value, range, or list
     hardFilter: bool  # Must exclude results violating this
 
 
@@ -264,14 +266,18 @@ class DeclaredIntent:
 class InferredIntent:
     """Inferred intent components"""
 
-    useCases: list[UseCase] = field(default_factory=list)  # [comparison, learning, troubleshooting, ...]
+    useCases: list[UseCase] = field(
+        default_factory=list
+    )  # [comparison, learning, troubleshooting, ...]
     temporalIntent: TemporalIntent | None = None
     documentContext: DocumentContext | None = None  # From open docs/emails
     meetingContext: MeetingContext | None = None  # From calendar/Meet
     programmingContext: ProgrammingContext | None = None  # From programming queries
     resultType: ResultType | None = None
     complexity: Complexity = Complexity.MODERATE
-    ethicalSignals: list[EthicalSignal] = field(default_factory=list)  # Privacy, sustainability, etc.
+    ethicalSignals: list[EthicalSignal] = field(
+        default_factory=list
+    )  # Privacy, sustainability, etc.
 
 
 @dataclass
