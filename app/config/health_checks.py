@@ -242,7 +242,7 @@ class HealthCheckService:
         Check SearXNG connectivity with authoritative health check.
 
         Uses the /healthz endpoint and validates response.
-        Handles both JSON and HTML responses.
+        Handles both JSON and HTML/text responses.
         """
         start = time.time()
         try:
@@ -257,7 +257,17 @@ class HealthCheckService:
                         content_type = response.headers.get("Content-Type", "")
                         details = {"url": url, "content_type": content_type}
 
-                        if "application/json" in content_type:
+                        # Handle plain text response (like "OK")
+                        if "text/plain" in content_type:
+                            text = await response.text()
+                            details["response"] = text.strip()
+                            return ServiceHealth(
+                                service=ServiceType.SEARXNG,
+                                status=HealthStatus.HEALTHY,
+                                response_time_ms=round(response_time, 2),
+                                details=details,
+                            )
+                        elif "application/json" in content_type:
                             try:
                                 details["response"] = await response.json()
                             except Exception:
@@ -448,7 +458,7 @@ class HealthCheckService:
     async def check_qdrant(self) -> ServiceHealth:
         """Check Qdrant vector database health."""
         start = time.time()
-        
+
         # Check if Qdrant is enabled
         if os.getenv("ENABLE_QDRANT", "false").lower() != "true":
             return ServiceHealth(
@@ -456,33 +466,24 @@ class HealthCheckService:
                 status=HealthStatus.HEALTHY,
                 details={"status": "not_enabled", "note": "Set ENABLE_QDRANT=true to enable"},
             )
-        
+
         try:
             timeout = aiohttp.ClientTimeout(total=5)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                url = f"{self.qdrant_url.rstrip('/')}/ready"
+                # Try root endpoint first (most reliable across versions)
+                url = f"{self.qdrant_url.rstrip('/')}/"
                 async with session.get(url) as response:
                     response_time = (time.time() - start) * 1000
 
                     if response.status == 200:
+                        data = await response.json()
                         return ServiceHealth(
                             service=ServiceType.QDRANT,
                             status=HealthStatus.HEALTHY,
                             response_time_ms=round(response_time, 2),
-                            details={"url": url},
+                            details={"url": url, "version": data.get("version", "unknown")},
                         )
                     else:
-                        # Try cluster endpoint
-                        async with session.get(f"{self.qdrant_url.rstrip('/')}/cluster") as cluster_resp:
-                            if cluster_resp.status == 200:
-                                response_time = (time.time() - start) * 1000
-                                return ServiceHealth(
-                                    service=ServiceType.QDRANT,
-                                    status=HealthStatus.HEALTHY,
-                                    response_time_ms=round(response_time, 2),
-                                    details={"url": f"{self.qdrant_url}/cluster"},
-                                )
-
                         raise Exception(f"Status {response.status}")
 
         except TimeoutError:

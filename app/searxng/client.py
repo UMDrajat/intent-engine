@@ -126,18 +126,18 @@ class SearXNGClient:
         self.connect_timeout = 5.0  # Increased from 2.0s
         self.cache_ttl = 600  # Cache TTL: 10 minutes
 
-        # Initialize Redis cache if available
+        # Initialize Redis cache using shared cache from app.config
         self.cache = None
-        if REDIS_AVAILABLE and redis_host:
-            try:
-                self.cache = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
-                self.cache.ping()
-                logger.info(f"SearXNG Redis cache connected: {redis_host}:{redis_port}")
-            except Exception as e:
-                logger.warning(f"Failed to connect to Redis cache: {e}")
-                self.cache = None
-        else:
-            logger.info("SearXNG cache disabled (Redis not available)")
+        try:
+            from app.config.redis_cache import cache as shared_cache
+            if shared_cache and shared_cache._enabled:
+                self.cache = shared_cache
+                logger.info("SearXNG using shared Redis cache")
+            else:
+                logger.info("SearXNG cache disabled (shared cache not available)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize shared Redis cache: {e}")
+            self.cache = None
 
         # Initialize persistent HTTP client with connection pooling
         # This avoids creating a new connection for each request

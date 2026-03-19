@@ -178,17 +178,39 @@ async def lifespan(app: FastAPI):
         logger.info("Loading sentence transformer model...")
         from sentence_transformers import SentenceTransformer
         sentence_encoder = SentenceTransformer(
-            SENTENCE_TRANSFORMERS_MODEL, 
+            SENTENCE_TRANSFORMERS_MODEL,
             device=SENTENCE_TRANSFORMERS_DEVICE
         )
         logger.info(f"Sentence transformer loaded: {SENTENCE_TRANSFORMERS_MODEL}")
-        
+
         logger.info("Loading cross-encoder model...")
         cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
         logger.info("Cross-encoder loaded successfully")
     except Exception as e:
         logger.warning(f"Failed to preload ML models: {e}")
         logger.warning("Models will be loaded on first request (cold start)")
+
+    # Pre-load embedding cache (optimized ranking)
+    try:
+        logger.info("Pre-loading embedding cache...")
+        from app.config.optimized_cache import get_embedding_cache
+        embedding_cache = get_embedding_cache()
+        # Warm up cache with common queries
+        common_queries = [
+            "python tutorial",
+            "best programming laptop",
+            "how to learn coding",
+            "web development framework",
+            "machine learning basics",
+        ]
+        for query in common_queries:
+            try:
+                embedding_cache.encode_text(query)
+            except Exception:
+                pass  # Skip on error, non-critical
+        logger.info("Embedding cache pre-loaded with common queries")
+    except Exception as e:
+        logger.warning(f"Failed to pre-load embedding cache: {e}")
 
     # Mark models as loaded (in a real app, this would happen after loading)
     from app.config.health_checks import health_checker
@@ -509,6 +531,110 @@ async def liveness_probe():
                 "timestamp": datetime.now(UTC).isoformat(),
             },
         )
+
+
+# =============================================================================
+# Cache Management Endpoints
+# =============================================================================
+
+@app.post("/cache/warm")
+async def warm_cache(queries: Optional[list[str]] = None):
+    """
+    Warm up embedding cache with common queries.
+    
+    This endpoint pre-loads the embedding cache with frequently used queries
+    to reduce first-request latency.
+    
+    Args:
+        queries: Optional list of queries to cache (uses defaults if not provided)
+    
+    Returns:
+        Status message with number of queries cached
+    """
+    try:
+        from app.config.optimized_cache import get_embedding_cache
+        
+        embedding_cache = get_embedding_cache()
+        
+        # Use provided queries or defaults
+        queries_to_warm = queries or [
+            "python tutorial",
+            "best programming laptop",
+            "how to learn coding",
+            "web development framework",
+            "machine learning basics",
+            "data science course",
+            "javascript vs python",
+            "fix import error",
+        ]
+        
+        cached_count = 0
+        for query in queries_to_warm:
+            try:
+                embedding_cache.encode_text(query)
+                cached_count += 1
+            except Exception as e:
+                logger.debug(f"Failed to cache query '{query}': {e}")
+        
+        logger.info(f"Cache warmed with {cached_count}/{len(queries_to_warm)} queries")
+        
+        return {
+            "status": "success",
+            "queries_cached": cached_count,
+            "total_queries": len(queries_to_warm),
+        }
+    except Exception as e:
+        logger.error(f"Cache warming failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Cache warming failed: {str(e)}")
+
+
+@app.delete("/cache/ranking")
+async def clear_ranking_cache(pattern: str = "ranking:*"):
+    """
+    Clear ranking results from Redis cache.
+    
+    Args:
+        pattern: Cache key pattern to delete (default: ranking:*)
+    
+    Returns:
+        Status message
+    """
+    try:
+        from app.config.redis_cache import cache
+        
+        await cache.flush(pattern)
+        
+        return {
+            "status": "success",
+            "message": f"Cache cleared for pattern: {pattern}",
+        }
+    except Exception as e:
+        logger.error(f"Cache clear failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Cache clear failed: {str(e)}")
+
+
+@app.get("/cache/stats")
+async def get_cache_stats():
+    """
+    Get cache statistics including hit rate and memory usage.
+    
+    Returns:
+        Cache statistics
+    """
+    try:
+        from app.config.redis_cache import cache
+        
+        stats = await cache.get_stats()
+        memory = await cache.get_memory_usage()
+        
+        return {
+            "status": "success",
+            "cache_stats": stats,
+            "memory_usage_mb": memory,
+        }
+    except Exception as e:
+        logger.error(f"Cache stats failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Cache stats failed: {str(e)}")
 
 
 # =============================================================================

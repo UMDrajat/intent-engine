@@ -174,10 +174,11 @@ class UnifiedSearchService:
         # Step 3: Wait for federated search results with timeout
         try:
             # Add timeout to prevent hanging on slow backends
-            # Timeout scales with max_results but caps at 10 seconds
-            search_timeout = min(10.0, 3.0 + (request.max_results or 20) * 0.25)
+            # IMPROVED: Stricter timeout (max 5s) for better user experience
+            # Timeout scales with max_results but caps at 5 seconds (Priority 2 fix)
+            search_timeout = min(5.0, 2.0 + (request.max_results or 20) * 0.15)
             raw_results = await asyncio.wait_for(search_task, timeout=search_timeout)
-            logger.info(f"Federated search returned {len(raw_results)} raw results")
+            logger.info(f"Federated search returned {len(raw_results)} raw results in {search_timeout:.1f}s")
         except asyncio.TimeoutError:
             logger.warning(f"Federated search timed out after {search_timeout}s, cancelling...")
             search_task.cancel()
@@ -195,7 +196,8 @@ class UnifiedSearchService:
         logger.info(f"Aggregated to {len(aggregated_results)} unique results")
 
         # Convert aggregated results to ranked results
-        ranked_results = await self._convert_aggregated_to_ranked(aggregated_results, universal_intent, request)
+        # Use enhanced ranker if available, fallback to default
+        ranked_results = await self._convert_aggregated_to_ranked_enhanced(aggregated_results, universal_intent, request)
 
         # Step 5: Apply privacy filters (if requested)
         if request.min_privacy_score or request.exclude_big_tech:
@@ -601,6 +603,93 @@ class UnifiedSearchService:
             reasons.append(f"Suitable for {inferred.useCases[0].value}")
 
         return reasons[:3]
+
+    async def _convert_aggregated_to_ranked_enhanced(
+        self,
+        aggregated_results: list[AggregatedResult],
+        universal_intent: UniversalIntent | None,
+        request: UnifiedSearchRequest,
+    ) -> list[RankedSearchResult]:
+        """
+        Convert aggregated results to ranked results using enhanced multi-factor ranking.
+        
+        This is the enhanced version with:
+        1. Multi-factor scoring (semantic + authority + freshness + quality)
+        2. Content filtering (trusted sources, low-quality filtering)
+        3. Intent fallback for null goals
+        4. Better null safety
+        
+        Args:
+            aggregated_results: Aggregated search results
+            universal_intent: User intent (may be None)
+            request: Original search request
+        
+        Returns:
+            List of ranked search results
+        """
+        from app.ranking.enhanced_ranker import EnhancedRanker
+        
+        # Apply intent fallback if needed
+        if universal_intent is None or not universal_intent.declared or not universal_intent.declared.goal:
+            from app.extraction.intent_fallback import enhance_intent_with_fallback
+            universal_intent = enhance_intent_with_fallback(universal_intent, request.query)
+            logger.info(f"Applied intent fallback: goal={universal_intent.declared.goal.value if universal_intent.declared.goal else 'unknown'}")
+        
+        # Convert aggregated results to dict format for enhanced ranker
+        candidates = []
+        for agg in aggregated_results:
+            candidate = {
+                "id": hashlib.md5(agg.url.encode()).hexdigest(),
+                "title": agg.title,
+                "content": agg.content,
+                "url": agg.url,
+                "platform": agg.source.value if agg.source else "unknown",
+                "qualityScore": agg.best_score,
+                "tags": agg.metadata.get("tags", []),
+                "publishedDate": agg.metadata.get("published_date"),
+            }
+            candidates.append(candidate)
+        
+        # Use enhanced ranker
+        ranker = EnhancedRanker(config={
+            "weights": request.weights if hasattr(request, 'weights') and request.weights else None,
+            "filtering": {
+                "enable_domain_filter": True,
+                "enable_quality_filter": True,
+                "min_quality_threshold": 0.3,
+                "remove_duplicates": True,
+            }
+        })
+        
+        ranked = await ranker.rank_with_filters(candidates, universal_intent, request.options if hasattr(request, 'options') else None)
+        
+        # Convert back to RankedSearchResult format
+        ranked_results = []
+        for idx, r in enumerate(ranked):
+            ranked_result = RankedSearchResult(
+                url=r.result.url,
+                title=r.result.title,
+                content=r.result.description,
+                url_final=r.result.url,
+                engine=r.result.platform or "unknown",
+                score=r.finalScore,
+                original_score=r.result.qualityScore,
+                ranked_score=r.finalScore,
+                rank=idx + 1,
+                category="general",
+                thumbnail=None,
+                published_date=r.result.published_date,
+                price=r.result.price,
+                currency=None,
+                intent_goal=universal_intent.declared.goal.value if universal_intent.declared and universal_intent.declared.goal else None,
+                match_reasons=r.matchReasons,
+                privacy_score=None,
+                ethical_alignment=None,
+            )
+            ranked_results.append(ranked_result)
+        
+        logger.info(f"Enhanced ranking: {len(ranked_results)} results with multi-factor scoring")
+        return ranked_results
 
     def _count_backend_distribution(self, results: list[RouterSearchResult]) -> dict[str, int]:
         """Count results per backend"""

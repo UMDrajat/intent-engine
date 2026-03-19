@@ -1,0 +1,741 @@
+# =============================================================================
+# Intent Engine - Complete Multi-Container Docker Compose
+# =============================================================================
+# This Docker Compose file orchestrates ALL services for the Intent Engine:
+#
+# Core Services:
+#   - PostgreSQL 15 (Primary Database)
+#   - Redis/Valkey 8 (Cache & Rate Limiting)
+#   - Qdrant (Vector Database for Semantic Search)
+#   - SearXNG (Privacy-Focused Search Backend)
+#
+# Application Services:
+#   - Intent Engine API (FastAPI - Main Application)
+#   - ARQ Worker (Background Tasks)
+#   - Vector Indexer (Indexes content into Qdrant)
+#
+# Go Services (Optional):
+#   - Go Search API (Bleve-based Search)
+#   - Go Crawler (Web Crawler)
+#   - Go Indexer (Content Indexer)
+#   - Go Unified Search API (Unified Search with Intent Ranking)
+#
+# Monitoring & Observability:
+#   - Prometheus (Metrics Collection)
+#   - Grafana (Visualization Dashboards)
+#   - PgBouncer (Database Connection Pooling)
+#
+# Usage:
+#   docker-compose up -d                    # Start all services
+#   docker-compose up -d --profile monitoring  # Include monitoring
+#   docker-compose up -d --profile go-services # Include Go services
+#   docker-compose ps                       # Check service status
+#   docker-compose logs -f                  # View logs
+#   docker-compose down                     # Stop all services
+# =============================================================================
+
+version: "3.8"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  # Main application network
+  intent-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+  # SearXNG isolated network (for privacy)
+  searxng:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  # Database persistence
+  postgres_data:
+    driver: local
+    name: intent-engine-postgres-data
+
+  # Cache persistence
+  redis_data:
+    driver: local
+    name: intent-engine-redis-data
+
+  # Vector database
+  qdrant_data:
+    driver: local
+    name: intent-engine-qdrant-data
+
+  # Search indexes
+  go-search-data:
+    driver: local
+    name: intent-engine-go-search-data
+
+  go-crawler-data:
+    driver: local
+    name: intent-engine-go-crawler-data
+
+  go-indexer-data:
+    driver: local
+    name: intent-engine-go-indexer-data
+
+  # Monitoring data
+  prometheus_data:
+    driver: local
+    name: intent-engine-prometheus-data
+
+  grafana_data:
+    driver: local
+    name: intent-engine-grafana-data
+
+  # Application data
+  app_data:
+    driver: local
+    name: intent-engine-app-data
+
+  # Logs
+  app_logs:
+    driver: local
+    name: intent-engine-app-logs
+
+  # SearXNG data
+  searxng_data:
+    driver: local
+    name: intent-engine-searxng-data
+
+# =============================================================================
+# Core Infrastructure Services
+# =============================================================================
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Primary Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: intent-engine-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-intent_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-intent_engine}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT_EXTERNAL:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/database/migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - intent-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER:-intent_user} -d ${POSTGRES_DB:-intent_engine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ---------------------------------------------------------------------------
+  # Redis/Valkey - Cache & Rate Limiting
+  # ---------------------------------------------------------------------------
+  redis:
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: intent-engine-redis
+    restart: unless-stopped
+    command: valkey-server --save 30 1 --loglevel warning --maxmemory 1024mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - intent-network
+      - searxng
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # Qdrant - Vector Database for Semantic Search
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: intent-engine-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT_EXTERNAL:-6333}:6333"
+      - "${QDRANT_GRPC_PORT_EXTERNAL:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+    networks:
+      - intent-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ---------------------------------------------------------------------------
+  # SearXNG - Privacy-Focused Search Backend
+  # ---------------------------------------------------------------------------
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: intent-engine-searxng
+    restart: unless-stopped
+    ports:
+      - "${SEARXNG_PORT_EXTERNAL:-8080}:8080"
+    volumes:
+      - ./app/searxng:/etc/searxng:rw
+      - searxng_data:/var/searxng
+    environment:
+      - SEARXNG_BASE_URL=${SEARXNG_BASE_URL:-http://localhost:8080}
+      - SEARXNG_SECRET_KEY=${SEARXNG_SECRET_KEY:-}
+      - SEARXNG_LIMITER=${SEARXNG_LIMITER:-false}
+      - SEARXNG_IMAGE_PROXY=${SEARXNG_IMAGE_PROXY:-true}
+      - SEARXNG_DEFAULT_TIMEOUT=${SEARXNG_DEFAULT_TIMEOUT:-5.0}
+      - SEARXNG_SUSPEND_TIME=${SEARXNG_SUSPEND_TIME:-0}
+      - SEARXNG_CACHE_URL=${SEARXNG_CACHE_URL:-redis://redis:6379/1}
+      - SEARXNG_USE_CACHE=${SEARXNG_USE_CACHE:-true}
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    networks:
+      - searxng
+      - intent-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+# =============================================================================
+# Database Migration Service
+# =============================================================================
+  migrations:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+    container_name: intent-engine-migrations
+    command: >
+      sh -c "
+        echo 'Waiting for PostgreSQL...' &&
+        until pg_isready -h postgres -U ${POSTGRES_USER:-intent_user} -d ${POSTGRES_DB:-intent_engine}; do
+          sleep 2
+        done &&
+        echo 'Running database initialization...' &&
+        python scripts/init_db_standalone.py &&
+        echo 'Applying SQL migrations...' &&
+        psql -h postgres -U ${POSTGRES_USER:-intent_user} -d ${POSTGRES_DB:-intent_engine} -f infrastructure/database/migrations/001_create_missing_tables.sql || true &&
+        psql -h postgres -U ${POSTGRES_USER:-intent_user} -d ${POSTGRES_DB:-intent_engine} -f infrastructure/database/migrations/002_fix_click_tracking.sql || true &&
+        psql -h postgres -U ${POSTGRES_USER:-intent_user} -d ${POSTGRES_DB:-intent_engine} -f infrastructure/database/migrations/003_fix_conversion_fraud.sql || true &&
+        psql -h postgres -U ${POSTGRES_USER:-intent_user} -d ${POSTGRES_DB:-intent_engine} -f infrastructure/database/migrations/004_fix_ab_tests.sql || true &&
+        echo 'Migrations complete!'
+      "
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=${POSTGRES_USER:-intent_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}
+      - POSTGRES_DB=${POSTGRES_DB:-intent_engine}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}
+    networks:
+      - intent-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+# =============================================================================
+# Application Services
+# =============================================================================
+  # ---------------------------------------------------------------------------
+  # Intent Engine API - Main FastAPI Application
+  # ---------------------------------------------------------------------------
+  intent-engine-api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+    container_name: intent-engine-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT_EXTERNAL:-8000}:8000"
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}
+      - PGBOUNCER_ENABLED=${PGBOUNCER_ENABLED:-false}
+      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
+      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
+      - DATABASE_POOL_TIMEOUT=${DATABASE_POOL_TIMEOUT:-30}
+      - DATABASE_POOL_RECYCLE=${DATABASE_POOL_RECYCLE:-1800}
+
+      # Redis
+      - REDIS_ENABLED=true
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_MAX_CONNECTIONS=${REDIS_MAX_CONNECTIONS:-50}
+      - REDIS_TIMEOUT=${REDIS_TIMEOUT:-5.0}
+
+      # Application
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - WORKERS=${WORKERS:-2}
+
+      # Security
+      - SECRET_KEY=${SECRET_KEY:-change-this-to-a-secure-random-string-in-production}
+      - ENABLE_CORS=${ENABLE_CORS:-true}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-true}
+
+      # Rate Limiting
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+      - RATE_LIMIT_DEFAULT=${RATE_LIMIT_DEFAULT:-100/minute}
+      - RATE_LIMIT_STRICT=${RATE_LIMIT_STRICT:-10/minute}
+      - RATE_LIMIT_STORAGE_URL=redis://redis:6379/0
+
+      # SearXNG
+      - SEARXNG_BASE_URL=${SEARXNG_BASE_URL:-http://searxng:8080}
+
+      # Qdrant
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+
+      # Go Services
+      - ENABLE_GO_SERVICES=${ENABLE_GO_SERVICES:-false}
+      - GO_SEARCH_API_URL=${GO_SEARCH_API_URL:-http://go-search-api:8080}
+      - GO_UNIFIED_SEARCH_API_URL=${GO_UNIFIED_SEARCH_API_URL:-http://unified-search-api:8082}
+
+      # ML Models
+      - MODEL_CACHE_DIR=/app/data/models
+      - TRANSFORMERS_CACHE=/app/data/transformers
+      - SENTENCE_TRANSFORMERS_MODEL=${SENTENCE_TRANSFORMERS_MODEL:-all-MiniLM-L6-v2}
+      - SENTENCE_TRANSFORMERS_DEVICE=${SENTENCE_TRANSFORMERS_DEVICE:-cpu}
+      - EMBEDDING_CACHE_WARMUP=${EMBEDDING_CACHE_WARMUP:-true}
+      - EMBEDDING_CACHE_QUERIES=${EMBEDDING_CACHE_QUERIES:-how to,what is,learn,guide,tutorial,examples,vs,comparison,review,install,configure,setup,documentation,api,reference}
+
+      # Privacy
+      - ENABLE_ANONYMIZATION=${ENABLE_ANONYMIZATION:-true}
+      - ANONYMIZATION_SALT=${ANONYMIZATION_SALT:-generate-random-salt-for-anonymization}
+      - CONSENT_REQUIRED=${CONSENT_REQUIRED:-true}
+      - SESSION_DATA_RETENTION_HOURS=${SESSION_DATA_RETENTION_HOURS:-8}
+
+      # Monitoring
+      - ENABLE_METRICS=${ENABLE_METRICS:-true}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-30}
+      - HEALTH_CHECK_TIMEOUT=${HEALTH_CHECK_TIMEOUT:-10}
+      # Search optimization
+      - SEARXNG_TIMEOUT=${SEARXNG_TIMEOUT:-5.0}
+      - SEARCH_CACHE_TTL=${SEARCH_CACHE_TTL:-3600}
+      - ENABLE_SEARCH_STREAMING=${ENABLE_SEARCH_STREAMING:-true}
+    volumes:
+      - app_data:/app/data
+      - app_logs:/var/log/app
+    networks:
+      - intent-network
+      - searxng
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      searxng:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # ARQ Worker - Background Task Processor
+  # ---------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+    container_name: intent-engine-worker
+    command: arq app.worker.WorkerSettings
+    profiles:
+      - worker
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/0
+      - PLAYWRIGHT_BROWSERS_PATH=/app/pw-browsers
+      - ARQ_WORKER_CONCURRENCY=${ARQ_WORKER_CONCURRENCY:-5}
+      - ARQ_WORKER_MAX_JOBS=${ARQ_WORKER_MAX_JOBS:-100}
+    volumes:
+      - app_data:/app/data
+      - app_logs:/var/log/app
+    networks:
+      - intent-network
+      - searxng
+    depends_on:
+      - redis
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ---------------------------------------------------------------------------
+  # Vector Indexer - Indexes Content into Qdrant
+  # ---------------------------------------------------------------------------
+  vector-indexer:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+    container_name: intent-engine-vector-indexer
+    command: python scripts/start_vector_indexer.py
+    profiles:
+      - vector-indexer
+    restart: unless-stopped
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}
+    networks:
+      - intent-network
+    depends_on:
+      - qdrant
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+# =============================================================================
+# Go Services (Optional Profile: --profile go-services)
+# =============================================================================
+  # ---------------------------------------------------------------------------
+  # Go Search API - Bleve-based Search
+  # ---------------------------------------------------------------------------
+  go-search-api:
+    build:
+      context: ./go-crawler
+      dockerfile: deployments/Dockerfile.api
+    container_name: intent-go-search-api
+    profiles:
+      - go-services
+    restart: unless-stopped
+    ports:
+      - "${GO_SEARCH_API_PORT_EXTERNAL:-8081}:8080"
+    environment:
+      - BLEVE_PATH=/data/bleve
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - POSTGRES_DSN=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}?sslmode=disable
+      - BADGER_PATH=/data/badger
+      - REDIS_ADDR=redis:6379
+      # Go-specific database credentials (can override POSTGRES_*)
+      - GO_SEARCH_DB_USER=${GO_SEARCH_DB_USER:-${POSTGRES_USER:-intent_user}}
+      - GO_SEARCH_DB_PASSWORD=${GO_SEARCH_DB_PASSWORD:-${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}}
+      - GO_SEARCH_DB_HOST=${GO_SEARCH_DB_HOST:-postgres}
+      - GO_SEARCH_DB_PORT=${GO_SEARCH_DB_PORT:-5432}
+      - GO_SEARCH_DB_NAME=${GO_SEARCH_DB_NAME:-${POSTGRES_DB:-intent_engine}}
+    volumes:
+      - go-search-data:/data
+    networks:
+      - intent-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Go Crawler - Web Crawler
+  # ---------------------------------------------------------------------------
+  go-crawler:
+    build:
+      context: ./go-crawler
+      dockerfile: deployments/Dockerfile.crawler
+    container_name: intent-go-crawler
+    profiles:
+      - go-services
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_DSN=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}?sslmode=disable
+      - BADGER_PATH=/data/badger
+      - GO_SEARCH_DB_USER=${GO_SEARCH_DB_USER:-${POSTGRES_USER:-intent_user}}
+      - GO_SEARCH_DB_PASSWORD=${GO_SEARCH_DB_PASSWORD:-${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}}
+      - GO_SEARCH_DB_HOST=${GO_SEARCH_DB_HOST:-postgres}
+      - GO_SEARCH_DB_PORT=${GO_SEARCH_DB_PORT:-5432}
+      - GO_SEARCH_DB_NAME=${GO_SEARCH_DB_NAME:-${POSTGRES_DB:-intent_engine}}
+    volumes:
+      - go-crawler-data:/data
+    networks:
+      - intent-network
+      - searxng
+    command: >
+      ./crawler
+      -redis=redis:6379
+      -postgres=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}?sslmode=disable
+      -badger=/data/badger
+      -seed=${GO_CRAWLER_SEED_URLS:-https://go.dev,https://golang.org}
+      -max-pages=${GO_CRAWLER_MAX_PAGES:-100}
+      -max-depth=${GO_CRAWLER_MAX_DEPTH:-2}
+      -concurrency=${GO_CRAWLER_CONCURRENCY:-3}
+      -delay=${GO_CRAWLER_DELAY:-2000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Go Indexer - Content Indexer
+  # ---------------------------------------------------------------------------
+  go-indexer:
+    build:
+      context: ./go-crawler
+      dockerfile: deployments/Dockerfile.indexer
+    container_name: intent-go-indexer
+    profiles:
+      - go-services
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_DSN=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}?sslmode=disable
+      - BLEVE_PATH=/data/bleve
+      - BADGER_PATH=/data/badger
+      - GO_SEARCH_DB_USER=${GO_SEARCH_DB_USER:-${POSTGRES_USER:-intent_user}}
+      - GO_SEARCH_DB_PASSWORD=${GO_SEARCH_DB_PASSWORD:-${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}}
+      - GO_SEARCH_DB_HOST=${GO_SEARCH_DB_HOST:-postgres}
+      - GO_SEARCH_DB_PORT=${GO_SEARCH_DB_PORT:-5432}
+      - GO_SEARCH_DB_NAME=${GO_SEARCH_DB_NAME:-${POSTGRES_DB:-intent_engine}}
+    volumes:
+      - go-indexer-data:/data
+    networks:
+      - intent-network
+    command: >
+      ./indexer
+      -redis=redis:6379
+      -postgres=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}?sslmode=disable
+      -bleve=/data/bleve
+      -batch-size=${GO_INDEXER_BATCH_SIZE:-50}
+      -interval=${GO_INDEXER_INTERVAL:-60}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Go Unified Search API - Unified Search with Intent Ranking
+  # ---------------------------------------------------------------------------
+  unified-search-api:
+    build:
+      context: ./go-crawler
+      dockerfile: deployments/Dockerfile.unified-search
+    container_name: intent-unified-search-api
+    profiles:
+      - go-services
+    restart: unless-stopped
+    ports:
+      - "${GO_UNIFIED_SEARCH_API_PORT_EXTERNAL:-8082}:8082"
+    environment:
+      - PORT=8082
+      - BLEVE_PATH=/data/bleve
+      - BADGER_PATH=/data/badger
+      - POSTGRES_DSN=postgresql://${POSTGRES_USER:-intent_user}:${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}@postgres:5432/${POSTGRES_DB:-intent_engine}?sslmode=disable
+      - REDIS_ADDR=redis:6379
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
+      - QDRANT_ADDR=${QDRANT_ADDR:-qdrant:6333}
+      - CACHE_ENABLED=${CACHE_ENABLED:-true}
+      - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-3600}
+      - PARALLEL_SEARCH=${PARALLEL_SEARCH:-true}
+      - GO_SEARCH_DB_USER=${GO_SEARCH_DB_USER:-${POSTGRES_USER:-intent_user}}
+      - GO_SEARCH_DB_PASSWORD=${GO_SEARCH_DB_PASSWORD:-${POSTGRES_PASSWORD:-intent_secure_password_change_in_prod}}
+      - GO_SEARCH_DB_HOST=${GO_SEARCH_DB_HOST:-postgres}
+      - GO_SEARCH_DB_PORT=${GO_SEARCH_DB_PORT:-5432}
+      - GO_SEARCH_DB_NAME=${GO_SEARCH_DB_NAME:-${POSTGRES_DB:-intent_engine}}
+    volumes:
+      - go-search-data:/data
+    networks:
+      - intent-network
+      - searxng
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+      qdrant:
+        condition: service_started
+
+# =============================================================================
+# Optional Services (Profiles: monitoring, pgbouncer)
+# =============================================================================
+  # ---------------------------------------------------------------------------
+  # PgBouncer - Database Connection Pooling
+  # ---------------------------------------------------------------------------
+  pgbouncer:
+    image: edoburu/pgbouncer
+    container_name: intent-engine-pgbouncer
+    profiles:
+      - pgbouncer
+    restart: unless-stopped
+    ports:
+      - "${PGBOUNCER_PORT_EXTERNAL:-6543}:6543"
+    volumes:
+      - ./infrastructure/proxy/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./infrastructure/proxy/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    networks:
+      - intent-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6543 -U ${POSTGRES_USER:-intent_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Prometheus - Metrics Collection
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: intent-engine-prometheus
+    profiles:
+      - monitoring
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT_EXTERNAL:-9090}:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - intent-network
+    depends_on:
+      - intent-engine-api
+      - unified-search-api
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Grafana - Visualization Dashboards
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: intent-engine-grafana
+    profiles:
+      - monitoring
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT_EXTERNAL:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-grafana_secure_password_change_in_prod}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - intent-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
